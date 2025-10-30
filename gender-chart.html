@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #f3f5f7;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .chart-container {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        h2 {
+            text-align: center;
+            color: #333;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="chart-container">
+        <h2></h2>
+        <canvas id="genderChart"></canvas>
+    </div>
+
+    <script>
+        // URL 파라미터에서 데이터 가져오기
+        const urlParams = new URLSearchParams(window.location.search);
+        const femaleRatio = parseFloat(urlParams.get('female') || '50.17');
+        const maleRatio = parseFloat(urlParams.get('male') || '49.83');
+
+        // 도넛 차트
+        const ctx = document.getElementById('genderChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['여성', '남성'],
+                datasets: [{
+                    data: [femaleRatio, maleRatio],
+                    backgroundColor: ['#FF6B9D', '#4A90E2'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 15,
+                            font: { size: 14 }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.label + ': ' + context.parsed.toFixed(2) + '%';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
