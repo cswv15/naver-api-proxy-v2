@@ -1,4 +1,3 @@
-import chromium from '@sparticuz/chromium';
 import puppeteer from 'puppeteer-core';
 
 export default async function handler(req, res) {
@@ -18,43 +17,77 @@ export default async function handler(req, res) {
 
   const NAVER_ID = process.env.NAVER_AD_ID;
   const NAVER_PW = process.env.NAVER_AD_PW;
+  const BROWSERLESS_TOKEN = process.env.BROWSERLESS_TOKEN;
 
-  if (!NAVER_ID || !NAVER_PW) {
+  if (!NAVER_ID || !NAVER_PW || !BROWSERLESS_TOKEN) {
     return res.status(500).json({ error: 'Missing credentials' });
   }
 
   let browser = null;
 
   try {
-    browser = await puppeteer.launch({
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath,
-      headless: chromium.headless,
+    // Browserless 연결
+    browser = await puppeteer.connect({
+      browserWSEndpoint: `wss://chrome.browserless.io?token=${BROWSERLESS_TOKEN}`
     });
 
     const page = await browser.newPage();
+    
+    // 타임아웃 설정
+    page.setDefaultTimeout(60000);
 
-    await page.goto('https://searchad.naver.com/');
-    await page.waitForSelector('#id', { timeout: 10000 });
-
+    // 네이버 광고 로그인
+    await page.goto('https://searchad.naver.com/', { waitUntil: 'networkidle2' });
+    
+    await page.waitForSelector('#id');
     await page.type('#id', NAVER_ID);
     await page.type('#pw', NAVER_PW);
-    await page.click('.btn_login');
+    
+    await Promise.all([
+      page.click('.btn_login'),
+      page.waitForNavigation({ waitUntil: 'networkidle2' })
+    ]);
 
-    await page.waitForNavigation({ timeout: 15000 });
+    // 키워드 도구로 이동
+    await page.goto('https://searchad.naver.com/keywordstool', { waitUntil: 'networkidle2' });
+    await page.waitForTimeout(2000);
 
-    const keywordToolUrl = `https://searchad.naver.com/keywordstool?keyword=${encodeURIComponent(keyword)}`;
-    await page.goto(keywordToolUrl);
+    // 키워드 검색
+    await page.waitForSelector('input[placeholder*="키워드"]');
+    await page.type('input[placeholder*="키워드"]', keyword);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(3000);
+
+    // 첫 번째 키워드 클릭 (상세 페이지)
+    await page.waitForSelector('table tbody tr:first-child');
+    await page.click('table tbody tr:first-child');
     await page.waitForTimeout(5000);
 
+    // 데이터 추출
     const data = await page.evaluate(() => {
+      // 성별 데이터 추출 (실제 선택자는 페이지 확인 필요)
+      const genderData = {
+        female: 0,
+        male: 0
+      };
+      
+      // 연령 데이터 추출
+      const ageData = {};
+      
+      // PC/모바일 데이터 추출
+      const deviceData = {
+        pc: 0,
+        mobile: 0
+      };
+      
+      // 월별 데이터 추출
+      const monthlyData = [];
+
       return {
-        gender: {
-          female: 0,
-          male: 0
-        },
-        age: {}
+        gender: genderData,
+        age: ageData,
+        device: deviceData,
+        monthly: monthlyData
       };
     });
 
@@ -67,11 +100,16 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    if (browser) await browser.close();
+    if (browser) {
+      try {
+        await browser.close();
+      } catch (e) {}
+    }
     
     return res.status(500).json({ 
       error: 'Crawling failed',
-      message: error.message 
+      message: error.message,
+      stack: error.stack
     });
   }
 }
