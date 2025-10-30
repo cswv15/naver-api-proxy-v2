@@ -5,22 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
-        body {
+        * {
             margin: 0;
-            padding: 20px;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
             background: #f3f5f7;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 10px;
         }
         .chart-container {
-            max-width: 400px;
+            width: 100%;
+            max-width: 350px;
             margin: 0 auto;
+            padding: 10px;
         }
         h2 {
             text-align: center;
             color: #333;
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 600;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
+        }
+        canvas {
+            display: block;
+            max-width: 100%;
+            height: auto !important;
         }
     </style>
 </head>
@@ -31,12 +42,10 @@
     </div>
 
     <script>
-        // URL 파라미터에서 데이터 가져오기
         const urlParams = new URLSearchParams(window.location.search);
         const femaleRatio = parseFloat(urlParams.get('female') || '50.17');
         const maleRatio = parseFloat(urlParams.get('male') || '49.83');
 
-        // 도넛 차트
         const ctx = document.getElementById('genderChart').getContext('2d');
         new Chart(ctx, {
             type: 'doughnut',
@@ -51,12 +60,14 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: true,
+                aspectRatio: 1.5,
                 plugins: {
                     legend: {
                         position: 'bottom',
                         labels: {
-                            padding: 15,
-                            font: { size: 14 }
+                            padding: 10,
+                            font: { size: 12 },
+                            boxWidth: 15
                         }
                     },
                     tooltip: {
