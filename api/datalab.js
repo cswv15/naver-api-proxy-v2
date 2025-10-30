@@ -59,33 +59,33 @@ export default async function handler(req, res) {
     const previous30Days = allData.slice(-60, -30);
     const previous30DaysSum = previous30Days.reduce((sum, item) => sum + item.ratio, 0);
     
-    // 3개월 전 30일 (90일 전 ~ 120일 전)
-    const threeMonthsAgo30Days = allData.slice(-120, -90);
-    const threeMonthsAgo30DaysSum = threeMonthsAgo30Days.reduce((sum, item) => sum + item.ratio, 0);
+    // 최근 3개월 (90일)
+    const last3Months = allData.slice(-90);
+    const last3MonthsAvg = last3Months.reduce((sum, item) => sum + item.ratio, 0) / 3; // 월평균
     
-    // 6개월 전 30일 (180일 전 ~ 210일 전)
-    const sixMonthsAgo30Days = allData.slice(-210, -180);
-    const sixMonthsAgo30DaysSum = sixMonthsAgo30Days.reduce((sum, item) => sum + item.ratio, 0);
+    // 최근 6개월 (180일)
+    const last6Months = allData.slice(-180);
+    const last6MonthsAvg = last6Months.reduce((sum, item) => sum + item.ratio, 0) / 6; // 월평균
     
     data.last30DaysSum = last30DaysSum;
     
-    // 1개월 대비 변동율
+    // 1. 지난 30일 대비 변동율
     if (previous30DaysSum > 0) {
       data.changeRate1Month = parseFloat(((last30DaysSum - previous30DaysSum) / previous30DaysSum * 100).toFixed(2));
     } else {
       data.changeRate1Month = 0;
     }
     
-    // 3개월 대비 변동율
-    if (threeMonthsAgo30DaysSum > 0) {
-      data.changeRate3Months = parseFloat(((last30DaysSum - threeMonthsAgo30DaysSum) / threeMonthsAgo30DaysSum * 100).toFixed(2));
+    // 2. 최근 3개월 월평균 대비 변동율
+    if (last3MonthsAvg > 0) {
+      data.changeRate3Months = parseFloat(((last30DaysSum - last3MonthsAvg) / last3MonthsAvg * 100).toFixed(2));
     } else {
       data.changeRate3Months = 0;
     }
     
-    // 6개월 대비 변동율
-    if (sixMonthsAgo30DaysSum > 0) {
-      data.changeRate6Months = parseFloat(((last30DaysSum - sixMonthsAgo30DaysSum) / sixMonthsAgo30DaysSum * 100).toFixed(2));
+    // 3. 최근 6개월 월평균 대비 변동율
+    if (last6MonthsAvg > 0) {
+      data.changeRate6Months = parseFloat(((last30DaysSum - last6MonthsAvg) / last6MonthsAvg * 100).toFixed(2));
     } else {
       data.changeRate6Months = 0;
     }
