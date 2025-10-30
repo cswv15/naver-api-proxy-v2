@@ -14,15 +14,20 @@
             background: #f3f5f7;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
         }
         .chart-container {
             width: 100%;
+            max-width: 400px;
             margin: 0 auto;
-            padding: 0;
+            padding: 20px;
         }
         canvas {
             display: block;
-            max-width: 100%;
+            width: 100% !important;
             height: auto !important;
         }
     </style>
@@ -31,12 +36,10 @@
     <div class="chart-container">
         <canvas id="genderChart"></canvas>
     </div>
-
     <script>
         const urlParams = new URLSearchParams(window.location.search);
         const femaleRatio = parseFloat(urlParams.get('female') || '50.17');
         const maleRatio = parseFloat(urlParams.get('male') || '49.83');
-
         const ctx = document.getElementById('genderChart').getContext('2d');
         new Chart(ctx, {
             type: 'doughnut',
@@ -56,7 +59,7 @@
                     legend: {
                         position: 'bottom',
                         labels: {
-                            padding: 0,
+                            padding: 10,
                             font: { size: 12 },
                             boxWidth: 15
                         }
