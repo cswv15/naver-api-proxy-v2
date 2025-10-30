@@ -47,13 +47,26 @@ export default async function handler(req, res) {
 
   const data = await response.json();
   
-  // 최근 30일 ratio 합계 계산
+  // 최근 30일 및 이전 30일 ratio 합계 계산
   if (data.results && data.results[0] && data.results[0].data) {
     const allData = data.results[0].data;
+    
+    // 최근 30일과 이전 30일
     const last30Days = allData.slice(-30);
+    const previous30Days = allData.slice(-60, -30);
+    
     const last30DaysSum = last30Days.reduce((sum, item) => sum + item.ratio, 0);
+    const previous30DaysSum = previous30Days.reduce((sum, item) => sum + item.ratio, 0);
     
     data.last30DaysSum = last30DaysSum;
+    data.previous30DaysSum = previous30DaysSum;
+    
+    // 변동율 계산
+    if (previous30DaysSum > 0) {
+      data.changeRate = ((last30DaysSum - previous30DaysSum) / previous30DaysSum * 100).toFixed(2);
+    } else {
+      data.changeRate = 0;
+    }
     
     // 절대값 계산 (monthlyTotal이 제공된 경우)
     if (monthlyTotal) {
