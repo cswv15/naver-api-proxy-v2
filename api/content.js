@@ -47,10 +47,25 @@ export default async function handler(req, res) {
     // 총 발행량
     const totalContent = blogCount + cafeCount;
 
-    // 컨텐츠 포화도 계산 (monthlySearchVolume 제공 시)
-    let saturationRate = null;
-    if (monthlySearchVolume && totalContent > 0) {
-      saturationRate = parseFloat((parseFloat(monthlySearchVolume) / totalContent * 100).toFixed(2));
+    // 경쟁도 계산 (monthlySearchVolume 제공 시)
+    let blogCompetition = null;
+    let cafeCompetition = null;
+    let totalCompetition = null;
+    
+    if (monthlySearchVolume) {
+      const searchVolume = parseFloat(monthlySearchVolume);
+      
+      if (blogCount > 0) {
+        blogCompetition = parseFloat((searchVolume / blogCount * 100).toFixed(2));
+      }
+      
+      if (cafeCount > 0) {
+        cafeCompetition = parseFloat((searchVolume / cafeCount * 100).toFixed(2));
+      }
+      
+      if (totalContent > 0) {
+        totalCompetition = parseFloat((searchVolume / totalContent * 100).toFixed(2));
+      }
     }
 
     return res.status(200).json({
@@ -59,7 +74,9 @@ export default async function handler(req, res) {
       cafeCount,
       totalContent,
       monthlySearchVolume: monthlySearchVolume ? parseFloat(monthlySearchVolume) : null,
-      saturationRate
+      blogCompetition,
+      cafeCompetition,
+      totalCompetition
     });
 
   } catch (error) {
