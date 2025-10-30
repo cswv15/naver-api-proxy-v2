@@ -9,6 +9,7 @@ export default async function handler(req, res) {
 
   const keyword = req.query.keyword || req.body?.keyword;
   const monthlyTotal = req.query.monthlyTotal || req.body?.monthlyTotal;
+  const aggregation = req.query.aggregation || 'daily';
   
   if (!keyword) {
     return res.status(400).json({ error: 'keyword is required' });
@@ -69,6 +70,32 @@ export default async function handler(req, res) {
           label: label
         };
       });
+      
+      // 월별 집계 (aggregation=monthly인 경우)
+      if (aggregation === 'monthly') {
+        const monthlyData = {};
+        
+        data.results[0].data.forEach(item => {
+          const yearMonth = item.period.slice(0, 7); // "2024-11"
+          if (!monthlyData[yearMonth]) {
+            monthlyData[yearMonth] = {
+              period: yearMonth,
+              absoluteValues: [],
+              label: `${yearMonth.split('-')[0]}년 ${parseInt(yearMonth.split('-')[1])}월`
+            };
+          }
+          monthlyData[yearMonth].absoluteValues.push(item.absoluteValue);
+        });
+        
+        // 월별 평균 계산
+        data.results[0].data = Object.values(monthlyData).map(month => ({
+          period: month.period,
+          absoluteValue: Math.round(
+            month.absoluteValues.reduce((sum, val) => sum + val, 0) / month.absoluteValues.length
+          ),
+          label: month.label
+        }));
+      }
     }
   }
   
