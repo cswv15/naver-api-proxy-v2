@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     .digest('base64');
 
 const response = await fetch(
-  `https://api.searchad.naver.com/keywordstool?hintKeywords=${encodeURIComponent(keyword)}&showDetail=1`,
+  `https://api.searchad.naver.com/keywordstool?Keywords=${encodeURIComponent(keyword)}&showDetail=1`,
   {
     headers: {
       'X-API-KEY': API_KEY,
