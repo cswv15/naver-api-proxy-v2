@@ -1,5 +1,7 @@
 import puppeteer from 'puppeteer-core';
 
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -38,7 +40,7 @@ export default async function handler(req, res) {
 
     // 네이버 광고 로그인
     await page.goto('https://searchad.naver.com/', { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForTimeout(3000);
+    await delay(3000);
 
     // 스크린샷으로 확인
     const screenshot1 = await page.screenshot({ encoding: 'base64' });
@@ -63,18 +65,18 @@ export default async function handler(req, res) {
 
     // 키워드 도구로 이동
     await page.goto('https://searchad.naver.com/keywordstool', { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(2000);
+    await delay(2000);
 
     // 키워드 검색
     await page.waitForSelector('input[placeholder*="키워드"]');
     await page.type('input[placeholder*="키워드"]', keyword);
     await page.keyboard.press('Enter');
-    await page.waitForTimeout(3000);
+    await delay(3000);
 
     // 첫 번째 키워드 클릭 (상세 페이지)
     await page.waitForSelector('table tbody tr:first-child');
     await page.click('table tbody tr:first-child');
-    await page.waitForTimeout(5000);
+    await delay(5000);
 
     // 데이터 추출
     const data = await page.evaluate(() => {
