@@ -59,15 +59,16 @@ export default async function handler(req, res) {
     if (monthlyTotal) {
       const calibrationFactor = parseFloat(monthlyTotal) / last30DaysSum;
       
-      // 각 데이터에 absoluteValue와 label 추가
-      data.results[0].data = allData.map(item => {
+      // 각 데이터에 absoluteValue 추가
+      const dataWithAbsolute = allData.map(item => {
         const [year, month, day] = item.period.split('-');
         const label = day === '01' ? `${year}년 ${parseInt(month)}월` : '';
         
         return {
           ...item,
           absoluteValue: Math.round(item.ratio * calibrationFactor),
-          label: label
+          label: label,
+          yearMonth: `${year}-${month}`
         };
       });
       
@@ -75,16 +76,16 @@ export default async function handler(req, res) {
       if (aggregation === 'monthly') {
         const monthlyData = {};
         
-        data.results[0].data.forEach(item => {
-          const yearMonth = item.period.slice(0, 7); // "2024-11"
-          if (!monthlyData[yearMonth]) {
-            monthlyData[yearMonth] = {
-              period: yearMonth,
+        dataWithAbsolute.forEach(item => {
+          if (!monthlyData[item.yearMonth]) {
+            monthlyData[item.yearMonth] = {
+              period: item.yearMonth,
               absoluteValues: [],
-              label: `${yearMonth.split('-')[0]}년 ${parseInt(yearMonth.split('-')[1])}월`
+              year: item.yearMonth.split('-')[0],
+              month: item.yearMonth.split('-')[1]
             };
           }
-          monthlyData[yearMonth].absoluteValues.push(item.absoluteValue);
+          monthlyData[item.yearMonth].absoluteValues.push(item.absoluteValue);
         });
         
         // 월별 평균 계산
@@ -93,7 +94,14 @@ export default async function handler(req, res) {
           absoluteValue: Math.round(
             month.absoluteValues.reduce((sum, val) => sum + val, 0) / month.absoluteValues.length
           ),
-          label: month.label
+          label: `${month.year}년 ${parseInt(month.month)}월`
+        }));
+      } else {
+        // 일별 데이터 (기본)
+        data.results[0].data = dataWithAbsolute.map(item => ({
+          period: item.period,
+          absoluteValue: item.absoluteValue,
+          label: item.label
         }));
       }
     }
