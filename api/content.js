@@ -16,18 +16,10 @@ export default async function handler(req, res) {
   const CLIENT_ID = '2KmBNl2qXg7vRy_lD0DJ';
   const CLIENT_SECRET = '9cB78MrhD6';
 
-  // 30일 전 날짜 계산
-  const today = new Date();
-  const thirtyDaysAgo = new Date(today);
-  thirtyDaysAgo.setDate(today.getDate() - 30);
-  
-  const startDate = thirtyDaysAgo.toISOString().split('T')[0].replace(/-/g, '');
-  const endDate = today.toISOString().split('T')[0].replace(/-/g, '');
-
   try {
-    // 블로그 검색
+    // 블로그 검색 (전체)
     const blogResponse = await fetch(
-      `https://openapi.naver.com/v1/search/blog.json?query=${encodeURIComponent(keyword)}&display=1&start=1&sort=date`,
+      `https://openapi.naver.com/v1/search/blog.json?query=${encodeURIComponent(keyword)}&display=1`,
       {
         headers: {
           'X-Naver-Client-Id': CLIENT_ID,
@@ -38,9 +30,9 @@ export default async function handler(req, res) {
     const blogData = await blogResponse.json();
     const blogCount = blogData.total || 0;
 
-    // 카페 검색
+    // 카페 검색 (전체)
     const cafeResponse = await fetch(
-      `https://openapi.naver.com/v1/search/cafearticle.json?query=${encodeURIComponent(keyword)}&display=1&start=1&sort=date`,
+      `https://openapi.naver.com/v1/search/cafearticle.json?query=${encodeURIComponent(keyword)}&display=1`,
       {
         headers: {
           'X-Naver-Client-Id': CLIENT_ID,
@@ -56,10 +48,6 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       keyword,
-      period: {
-        start: startDate,
-        end: endDate
-      },
       blogCount,
       cafeCount,
       totalContent
