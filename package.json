@@ -1,5 +1,9 @@
 {
   "name": "naver-api-proxy",
   "version": "1.0.0",
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "chrome-aws-lambda": "^10.1.0",
+    "puppeteer-core": "^24.27.0"
+  }
 }
