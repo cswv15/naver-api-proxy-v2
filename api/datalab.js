@@ -8,6 +8,7 @@ export default async function handler(req, res) {
   }
 
   const keyword = req.query.keyword || req.body?.keyword;
+  const monthlyTotal = req.query.monthlyTotal || req.body?.monthlyTotal;
   
   if (!keyword) {
     return res.status(400).json({ error: 'keyword is required' });
@@ -43,16 +44,26 @@ export default async function handler(req, res) {
     body: JSON.stringify(body)
   });
 
-const data = await response.json();
+  const data = await response.json();
   
   // 최근 30일 ratio 합계 계산
   if (data.results && data.results[0] && data.results[0].data) {
     const allData = data.results[0].data;
-    const last30Days = allData.slice(-30); // 최근 30일
+    const last30Days = allData.slice(-30);
     const last30DaysSum = last30Days.reduce((sum, item) => sum + item.ratio, 0);
     
-    // 응답에 추가
     data.last30DaysSum = last30DaysSum;
+    
+    // 절대값 계산 (monthlyTotal이 제공된 경우)
+    if (monthlyTotal) {
+      const calibrationFactor = parseFloat(monthlyTotal) / last30DaysSum;
+      
+      // 각 데이터에 absoluteValue 추가
+      data.results[0].data = allData.map(item => ({
+        ...item,
+        absoluteValue: Math.round(item.ratio * calibrationFactor)
+      }));
+    }
   }
   
   return res.status(200).json(data);
