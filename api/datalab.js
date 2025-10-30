@@ -8,6 +8,8 @@ export default async function handler(req, res) {
   }
 
   const keyword = req.query.keyword || req.body?.keyword;
+  const monthlyPcQcCnt = req.query.monthlyPcQcCnt || req.body?.monthlyPcQcCnt;
+  const monthlyMobileQcCnt = req.query.monthlyMobileQcCnt || req.body?.monthlyMobileQcCnt;
   const monthlyTotal = req.query.monthlyTotal || req.body?.monthlyTotal;
   const aggregation = req.query.aggregation || 'daily';
   
@@ -61,11 +63,41 @@ export default async function handler(req, res) {
     data.last30DaysSum = last30DaysSum;
     data.previous30DaysSum = previous30DaysSum;
     
-    // 변동율 계산
+    // 전체 변동율 계산
     if (previous30DaysSum > 0) {
-      data.changeRate = ((last30DaysSum - previous30DaysSum) / previous30DaysSum * 100).toFixed(2);
+      data.changeRate = parseFloat(((last30DaysSum - previous30DaysSum) / previous30DaysSum * 100).toFixed(2));
     } else {
       data.changeRate = 0;
+    }
+    
+    // PC/모바일 변동율 계산 (monthlyPcQcCnt, monthlyMobileQcCnt 제공 시)
+    if (monthlyPcQcCnt && monthlyMobileQcCnt && monthlyTotal) {
+      const pcRatio = parseFloat(monthlyPcQcCnt) / parseFloat(monthlyTotal);
+      const mobileRatio = parseFloat(monthlyMobileQcCnt) / parseFloat(monthlyTotal);
+      
+      const calibrationFactor = parseFloat(monthlyTotal) / last30DaysSum;
+      
+      // PC 최근/이전 30일
+      const pcLast30 = last30DaysSum * calibrationFactor * pcRatio;
+      const pcPrevious30 = previous30DaysSum * calibrationFactor * pcRatio;
+      
+      // 모바일 최근/이전 30일
+      const mobileLast30 = last30DaysSum * calibrationFactor * mobileRatio;
+      const mobilePrevious30 = previous30DaysSum * calibrationFactor * mobileRatio;
+      
+      // PC 변동율
+      if (pcPrevious30 > 0) {
+        data.pcChangeRate = parseFloat(((pcLast30 - pcPrevious30) / pcPrevious30 * 100).toFixed(2));
+      } else {
+        data.pcChangeRate = 0;
+      }
+      
+      // 모바일 변동율
+      if (mobilePrevious30 > 0) {
+        data.mobileChangeRate = parseFloat(((mobileLast30 - mobilePrevious30) / mobilePrevious30 * 100).toFixed(2));
+      } else {
+        data.mobileChangeRate = 0;
+      }
     }
     
     // 절대값 계산 (monthlyTotal이 제공된 경우)
