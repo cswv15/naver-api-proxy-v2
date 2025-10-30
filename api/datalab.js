@@ -8,8 +8,6 @@ export default async function handler(req, res) {
   }
 
   const keyword = req.query.keyword || req.body?.keyword;
-  const monthlyPcQcCnt = req.query.monthlyPcQcCnt || req.body?.monthlyPcQcCnt;
-  const monthlyMobileQcCnt = req.query.monthlyMobileQcCnt || req.body?.monthlyMobileQcCnt;
   const monthlyTotal = req.query.monthlyTotal || req.body?.monthlyTotal;
   const aggregation = req.query.aggregation || 'daily';
   
@@ -49,55 +47,47 @@ export default async function handler(req, res) {
 
   const data = await response.json();
   
-  // 최근 30일 및 이전 30일 ratio 합계 계산
+  // 변동율 계산
   if (data.results && data.results[0] && data.results[0].data) {
     const allData = data.results[0].data;
     
-    // 최근 30일과 이전 30일
+    // 최근 30일
     const last30Days = allData.slice(-30);
-    const previous30Days = allData.slice(-60, -30);
-    
     const last30DaysSum = last30Days.reduce((sum, item) => sum + item.ratio, 0);
+    
+    // 이전 30일 (30일 전 ~ 60일 전)
+    const previous30Days = allData.slice(-60, -30);
     const previous30DaysSum = previous30Days.reduce((sum, item) => sum + item.ratio, 0);
     
-    data.last30DaysSum = last30DaysSum;
-    data.previous30DaysSum = previous30DaysSum;
+    // 3개월 전 30일 (90일 전 ~ 120일 전)
+    const threeMonthsAgo30Days = allData.slice(-120, -90);
+    const threeMonthsAgo30DaysSum = threeMonthsAgo30Days.reduce((sum, item) => sum + item.ratio, 0);
     
-    // 전체 변동율 계산
+    // 6개월 전 30일 (180일 전 ~ 210일 전)
+    const sixMonthsAgo30Days = allData.slice(-210, -180);
+    const sixMonthsAgo30DaysSum = sixMonthsAgo30Days.reduce((sum, item) => sum + item.ratio, 0);
+    
+    data.last30DaysSum = last30DaysSum;
+    
+    // 1개월 대비 변동율
     if (previous30DaysSum > 0) {
-      data.changeRate = parseFloat(((last30DaysSum - previous30DaysSum) / previous30DaysSum * 100).toFixed(2));
+      data.changeRate1Month = parseFloat(((last30DaysSum - previous30DaysSum) / previous30DaysSum * 100).toFixed(2));
     } else {
-      data.changeRate = 0;
+      data.changeRate1Month = 0;
     }
     
-    // PC/모바일 변동율 계산 (monthlyPcQcCnt, monthlyMobileQcCnt 제공 시)
-    if (monthlyPcQcCnt && monthlyMobileQcCnt && monthlyTotal) {
-      const pcRatio = parseFloat(monthlyPcQcCnt) / parseFloat(monthlyTotal);
-      const mobileRatio = parseFloat(monthlyMobileQcCnt) / parseFloat(monthlyTotal);
-      
-      const calibrationFactor = parseFloat(monthlyTotal) / last30DaysSum;
-      
-      // PC 최근/이전 30일
-      const pcLast30 = last30DaysSum * calibrationFactor * pcRatio;
-      const pcPrevious30 = previous30DaysSum * calibrationFactor * pcRatio;
-      
-      // 모바일 최근/이전 30일
-      const mobileLast30 = last30DaysSum * calibrationFactor * mobileRatio;
-      const mobilePrevious30 = previous30DaysSum * calibrationFactor * mobileRatio;
-      
-      // PC 변동율
-      if (pcPrevious30 > 0) {
-        data.pcChangeRate = parseFloat(((pcLast30 - pcPrevious30) / pcPrevious30 * 100).toFixed(2));
-      } else {
-        data.pcChangeRate = 0;
-      }
-      
-      // 모바일 변동율
-      if (mobilePrevious30 > 0) {
-        data.mobileChangeRate = parseFloat(((mobileLast30 - mobilePrevious30) / mobilePrevious30 * 100).toFixed(2));
-      } else {
-        data.mobileChangeRate = 0;
-      }
+    // 3개월 대비 변동율
+    if (threeMonthsAgo30DaysSum > 0) {
+      data.changeRate3Months = parseFloat(((last30DaysSum - threeMonthsAgo30DaysSum) / threeMonthsAgo30DaysSum * 100).toFixed(2));
+    } else {
+      data.changeRate3Months = 0;
+    }
+    
+    // 6개월 대비 변동율
+    if (sixMonthsAgo30DaysSum > 0) {
+      data.changeRate6Months = parseFloat(((last30DaysSum - sixMonthsAgo30DaysSum) / sixMonthsAgo30DaysSum * 100).toFixed(2));
+    } else {
+      data.changeRate6Months = 0;
     }
     
     // 절대값 계산 (monthlyTotal이 제공된 경우)
