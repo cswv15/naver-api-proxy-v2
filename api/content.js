@@ -8,6 +8,7 @@ export default async function handler(req, res) {
   }
 
   const keyword = req.query.keyword || req.body?.keyword;
+  const monthlySearchVolume = req.query.monthlySearchVolume || req.body?.monthlySearchVolume;
   
   if (!keyword) {
     return res.status(400).json({ error: 'keyword is required' });
@@ -46,11 +47,19 @@ export default async function handler(req, res) {
     // 총 발행량
     const totalContent = blogCount + cafeCount;
 
+    // 컨텐츠 포화도 계산 (monthlySearchVolume 제공 시)
+    let saturationRate = null;
+    if (monthlySearchVolume && totalContent > 0) {
+      saturationRate = parseFloat((parseFloat(monthlySearchVolume) / totalContent * 100).toFixed(2));
+    }
+
     return res.status(200).json({
       keyword,
       blogCount,
       cafeCount,
-      totalContent
+      totalContent,
+      monthlySearchVolume: monthlySearchVolume ? parseFloat(monthlySearchVolume) : null,
+      saturationRate
     });
 
   } catch (error) {
