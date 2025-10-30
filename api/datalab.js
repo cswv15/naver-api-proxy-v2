@@ -88,14 +88,22 @@ export default async function handler(req, res) {
           monthlyData[item.yearMonth].absoluteValues.push(item.absoluteValue);
         });
         
-        // 월별 평균 계산
-        data.results[0].data = Object.values(monthlyData).map(month => ({
+        // 월별 합계 계산
+        const monthlyResult = Object.values(monthlyData).map(month => ({
           period: month.period,
           absoluteValue: Math.round(
             month.absoluteValues.reduce((sum, val) => sum + val, 0)
           ),
-          label: `${month.year}년 ${parseInt(month.month)}월`
+          label: `${month.year}년 ${parseInt(month.month)}월`,
+          daysCount: month.absoluteValues.length
         }));
+
+        // 첫 번째 월이 불완전하면 제거 (27일 미만)
+        if (monthlyResult.length > 0 && monthlyResult[0].daysCount < 27) {
+          monthlyResult.shift();
+        }
+
+        data.results[0].data = monthlyResult;
       } else {
         // 일별 데이터 (기본)
         data.results[0].data = dataWithAbsolute.map(item => ({
