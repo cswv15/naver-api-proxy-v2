@@ -37,19 +37,32 @@ export default async function handler(req, res) {
     page.setDefaultTimeout(60000);
 
     // 네이버 광고 로그인
-    await page.goto('https://searchad.naver.com/', { waitUntil: 'networkidle2' });
-    
-    await page.waitForSelector('#id');
-    await page.type('#id', NAVER_ID);
-    await page.type('#pw', NAVER_PW);
-    
+    await page.goto('https://searchad.naver.com/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForTimeout(3000);
+
+    // 스크린샷으로 확인
+    const screenshot1 = await page.screenshot({ encoding: 'base64' });
+
+    // 로그인 폼 찾기
+    const loginForm = await page.$('#id');
+    if (!loginForm) {
+      await browser.close();
+      return res.status(500).json({ 
+        error: 'Login form not found',
+        screenshot: `data:image/png;base64,${screenshot1}`
+      });
+    }
+
+    await page.type('#id', NAVER_ID, { delay: 100 });
+    await page.type('#pw', NAVER_PW, { delay: 100 });
+
     await Promise.all([
       page.click('.btn_login'),
-      page.waitForNavigation({ waitUntil: 'networkidle2' })
+      page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 })
     ]);
 
     // 키워드 도구로 이동
-    await page.goto('https://searchad.naver.com/keywordstool', { waitUntil: 'networkidle2' });
+    await page.goto('https://searchad.naver.com/keywordstool', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(2000);
 
     // 키워드 검색
