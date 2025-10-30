@@ -18,83 +18,100 @@ export default async function handler(req, res) {
   const CLIENT_ID = '2KmBNl2qXg7vRy_lD0DJ';
   const CLIENT_SECRET = '9cB78MrhD6';
 
-  // 최근 1년 (일별 데이터)
   const endDate = new Date();
   const startDate = new Date();
   startDate.setFullYear(startDate.getFullYear() - 1);
 
-  const body = {
-    startDate: startDate.toISOString().slice(0, 10).replace(/-/g, '-'),
-    endDate: endDate.toISOString().slice(0, 10).replace(/-/g, '-'),
-    timeUnit: 'date',
-    keywordGroups: [
-      {
-        groupName: keyword,
-        keywords: [keyword]
-      }
-    ]
-  };
+  const startDateStr = startDate.toISOString().slice(0, 10);
+  const endDateStr = endDate.toISOString().slice(0, 10);
 
-  const response = await fetch('https://openapi.naver.com/v1/datalab/search', {
-    method: 'POST',
-    headers: {
-      'X-Naver-Client-Id': CLIENT_ID,
-      'X-Naver-Client-Secret': CLIENT_SECRET,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(body)
-  });
-
-  const data = await response.json();
-  
-  // 변동율 계산
-  if (data.results && data.results[0] && data.results[0].data) {
-    const allData = data.results[0].data;
+  try {
+    // 1. 전체 데이터
+    const totalData = await fetchData(keyword, startDateStr, endDateStr, CLIENT_ID, CLIENT_SECRET);
     
-    // 최근 30일
+    // 2. 성별 데이터
+    const femaleData = await fetchData(keyword, startDateStr, endDateStr, CLIENT_ID, CLIENT_SECRET, { gender: 'f' });
+    const maleData = await fetchData(keyword, startDateStr, endDateStr, CLIENT_ID, CLIENT_SECRET, { gender: 'm' });
+    
+    // 3. 연령별 데이터
+    const ageGroups = [
+      { label: '0-12세', ages: ['1'] },
+      { label: '13-18세', ages: ['2'] },
+      { label: '19-24세', ages: ['3'] },
+      { label: '25-29세', ages: ['4'] },
+      { label: '30-34세', ages: ['5'] },
+      { label: '35-39세', ages: ['6'] },
+      { label: '40-44세', ages: ['7'] },
+      { label: '45-49세', ages: ['8'] },
+      { label: '50-54세', ages: ['9'] },
+      { label: '55-59세', ages: ['10'] },
+      { label: '60세+', ages: ['11'] }
+    ];
+    
+    const ageData = [];
+    for (const group of ageGroups) {
+      const data = await fetchData(keyword, startDateStr, endDateStr, CLIENT_ID, CLIENT_SECRET, { ages: group.ages });
+      ageData.push({
+        label: group.label,
+        data: data
+      });
+    }
+
+    // 변동율 계산 (전체 데이터 기준)
+    const allData = totalData.results[0].data;
     const last30Days = allData.slice(-30);
     const last30DaysSum = last30Days.reduce((sum, item) => sum + item.ratio, 0);
     
-    // 이전 30일 (30일 전 ~ 60일 전)
     const previous30Days = allData.slice(-60, -30);
     const previous30DaysSum = previous30Days.reduce((sum, item) => sum + item.ratio, 0);
     
-    // 최근 3개월 (90일)
     const last3Months = allData.slice(-90);
-    const last3MonthsAvg = last3Months.reduce((sum, item) => sum + item.ratio, 0) / 3; // 월평균
+    const last3MonthsAvg = last3Months.reduce((sum, item) => sum + item.ratio, 0) / 3;
     
-    // 최근 6개월 (180일)
     const last6Months = allData.slice(-180);
-    const last6MonthsAvg = last6Months.reduce((sum, item) => sum + item.ratio, 0) / 6; // 월평균
+    const last6MonthsAvg = last6Months.reduce((sum, item) => sum + item.ratio, 0) / 6;
     
-    data.last30DaysSum = last30DaysSum;
+    const changeRate1Month = previous30DaysSum > 0 
+      ? parseFloat(((last30DaysSum - previous30DaysSum) / previous30DaysSum * 100).toFixed(2)) 
+      : 0;
     
-    // 1. 지난 30일 대비 변동율
-    if (previous30DaysSum > 0) {
-      data.changeRate1Month = parseFloat(((last30DaysSum - previous30DaysSum) / previous30DaysSum * 100).toFixed(2));
-    } else {
-      data.changeRate1Month = 0;
+    const changeRate3Months = last3MonthsAvg > 0 
+      ? parseFloat(((last30DaysSum - last3MonthsAvg) / last3MonthsAvg * 100).toFixed(2)) 
+      : 0;
+    
+    const changeRate6Months = last6MonthsAvg > 0 
+      ? parseFloat(((last30DaysSum - last6MonthsAvg) / last6MonthsAvg * 100).toFixed(2)) 
+      : 0;
+
+    // 성별 비율 계산 (최근 30일 기준)
+    const femaleLast30 = femaleData.results[0].data.slice(-30).reduce((sum, item) => sum + item.ratio, 0);
+    const maleLast30 = maleData.results[0].data.slice(-30).reduce((sum, item) => sum + item.ratio, 0);
+    const genderTotal = femaleLast30 + maleLast30;
+    
+    const genderRatio = {
+      female: genderTotal > 0 ? parseFloat((femaleLast30 / genderTotal * 100).toFixed(2)) : 0,
+      male: genderTotal > 0 ? parseFloat((maleLast30 / genderTotal * 100).toFixed(2)) : 0
+    };
+
+    // 연령별 비율 계산 (최근 30일 기준)
+    const ageRatios = [];
+    let ageTotal = 0;
+    
+    for (const group of ageData) {
+      const sum = group.data.results[0].data.slice(-30).reduce((sum, item) => sum + item.ratio, 0);
+      ageTotal += sum;
+      ageRatios.push({ label: group.label, sum });
     }
     
-    // 2. 최근 3개월 월평균 대비 변동율
-    if (last3MonthsAvg > 0) {
-      data.changeRate3Months = parseFloat(((last30DaysSum - last3MonthsAvg) / last3MonthsAvg * 100).toFixed(2));
-    } else {
-      data.changeRate3Months = 0;
-    }
-    
-    // 3. 최근 6개월 월평균 대비 변동율
-    if (last6MonthsAvg > 0) {
-      data.changeRate6Months = parseFloat(((last30DaysSum - last6MonthsAvg) / last6MonthsAvg * 100).toFixed(2));
-    } else {
-      data.changeRate6Months = 0;
-    }
-    
-    // 절대값 계산 (monthlyTotal이 제공된 경우)
+    const ageRatiosFinal = ageRatios.map(item => ({
+      label: item.label,
+      ratio: ageTotal > 0 ? parseFloat((item.sum / ageTotal * 100).toFixed(2)) : 0
+    }));
+
+    // 절대값 계산 및 월별 집계
     if (monthlyTotal) {
       const calibrationFactor = parseFloat(monthlyTotal) / last30DaysSum;
       
-      // 각 데이터에 absoluteValue 추가
       const dataWithAbsolute = allData.map(item => {
         const [year, month, day] = item.period.split('-');
         const label = day === '01' ? `${year}년 ${parseInt(month)}월` : '';
@@ -107,7 +124,6 @@ export default async function handler(req, res) {
         };
       });
       
-      // 월별 집계 (aggregation=monthly인 경우)
       if (aggregation === 'monthly') {
         const monthlyData = {};
         
@@ -123,7 +139,6 @@ export default async function handler(req, res) {
           monthlyData[item.yearMonth].absoluteValues.push(item.absoluteValue);
         });
         
-        // 월별 합계 계산
         const monthlyResult = Object.values(monthlyData).map(month => ({
           period: month.period,
           absoluteValue: Math.round(
@@ -133,22 +148,61 @@ export default async function handler(req, res) {
           daysCount: month.absoluteValues.length
         }));
 
-        // 첫 번째 월이 불완전하면 제거 (27일 미만)
         if (monthlyResult.length > 0 && monthlyResult[0].daysCount < 27) {
           monthlyResult.shift();
         }
 
-        data.results[0].data = monthlyResult;
+        totalData.results[0].data = monthlyResult;
       } else {
-        // 일별 데이터 (기본)
-        data.results[0].data = dataWithAbsolute.map(item => ({
+        totalData.results[0].data = dataWithAbsolute.map(item => ({
           period: item.period,
           absoluteValue: item.absoluteValue,
           label: item.label
         }));
       }
     }
+    
+    return res.status(200).json({
+      ...totalData,
+      last30DaysSum,
+      changeRate1Month,
+      changeRate3Months,
+      changeRate6Months,
+      genderRatio,
+      ageRatios: ageRatiosFinal
+    });
+
+  } catch (error) {
+    return res.status(500).json({ 
+      error: 'API call failed',
+      message: error.message 
+    });
   }
-  
-  return res.status(200).json(data);
+}
+
+async function fetchData(keyword, startDate, endDate, clientId, clientSecret, filters = {}) {
+  const body = {
+    startDate,
+    endDate,
+    timeUnit: 'date',
+    keywordGroups: [
+      {
+        groupName: keyword,
+        keywords: [keyword]
+      }
+    ],
+    ...filters
+  };
+
+  const response = await fetch('https://openapi.naver.com/v1/datalab/search', {
+    method: 'POST',
+    headers: {
+      'X-Naver-Client-Id': clientId,
+      'X-Naver-Client-Secret': clientSecret,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+
+  return await response.json();
 }
