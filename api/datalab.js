@@ -58,11 +58,17 @@ export default async function handler(req, res) {
     if (monthlyTotal) {
       const calibrationFactor = parseFloat(monthlyTotal) / last30DaysSum;
       
-      // 각 데이터에 absoluteValue 추가
-      data.results[0].data = allData.map(item => ({
-        ...item,
-        absoluteValue: Math.round(item.ratio * calibrationFactor)
-      }));
+      // 각 데이터에 absoluteValue와 label 추가
+      data.results[0].data = allData.map(item => {
+        const [year, month, day] = item.period.split('-');
+        const label = day === '01' ? `${year}년 ${parseInt(month)}월` : '';
+        
+        return {
+          ...item,
+          absoluteValue: Math.round(item.ratio * calibrationFactor),
+          label: label
+        };
+      });
     }
   }
   
