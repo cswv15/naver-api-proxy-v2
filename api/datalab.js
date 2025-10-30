@@ -43,6 +43,17 @@ export default async function handler(req, res) {
     body: JSON.stringify(body)
   });
 
-  const data = await response.json();
+const data = await response.json();
+  
+  // 최근 30일 ratio 합계 계산
+  if (data.results && data.results[0] && data.results[0].data) {
+    const allData = data.results[0].data;
+    const last30Days = allData.slice(-30); // 최근 30일
+    const last30DaysSum = last30Days.reduce((sum, item) => sum + item.ratio, 0);
+    
+    // 응답에 추가
+    data.last30DaysSum = last30DaysSum;
+  }
+  
   return res.status(200).json(data);
 }
