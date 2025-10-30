@@ -28,7 +28,7 @@ export default async function handler(req, res) {
   try {
     // Browserless 연결
     browser = await puppeteer.connect({
-      browserWSEndpoint: `wss://chrome.browserless.io?token=${BROWSERLESS_TOKEN}`
+      browserWSEndpoint: `wss://production-sfo.browserless.io?token=${BROWSERLESS_TOKEN}`
     });
 
     const page = await browser.newPage();
