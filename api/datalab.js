@@ -92,7 +92,7 @@ export default async function handler(req, res) {
         data.results[0].data = Object.values(monthlyData).map(month => ({
           period: month.period,
           absoluteValue: Math.round(
-            month.absoluteValues.reduce((sum, val) => sum + val, 0) / month.absoluteValues.length
+            month.absoluteValues.reduce((sum, val) => sum + val, 0)
           ),
           label: `${month.year}년 ${parseInt(month.month)}월`
         }));
