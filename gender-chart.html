@@ -14,20 +14,15 @@
             background: #f3f5f7;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
         }
         .chart-container {
             width: 100%;
-            max-width: 600px;
             margin: 0 auto;
-            padding: 20px;
+            padding: 0;
         }
         canvas {
             display: block;
-            width: 100% !important;
+            max-width: 100%;
             height: auto !important;
         }
     </style>
@@ -54,15 +49,10 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: true,
-                aspectRatio: 1.2,
+                aspectRatio: 1.5,
                 plugins: {
                     legend: {
-                        position: 'bottom',
-                        labels: {
-                            padding: 10,
-                            font: { size: 12 },
-                            boxWidth: 15
-                        }
+                        display: false
                     },
                     tooltip: {
                         callbacks: {
