@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { 
+            margin: 0; 
+            padding: 0; 
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <span id="ratio"></span>
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const pcCount = parseFloat(urlParams.get('pc') || '15800');
+        const mobileCount = parseFloat(urlParams.get('mobile') || '122500');
+        const type = urlParams.get('type') || 'pc'; // 'pc' or 'mobile'
+        
+        const total = pcCount + mobileCount;
+        const pcRatio = (pcCount / total * 100).toFixed(1);
+        const mobileRatio = (mobileCount / total * 100).toFixed(1);
+        
+        document.getElementById('ratio').textContent = 
+            type === 'pc' ? pcRatio + '%' : mobileRatio + '%';
+    </script>
+</body>
+</html>
