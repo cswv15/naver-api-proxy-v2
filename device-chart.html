@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #f3f5f7;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 0;
+        }
+        .chart-container {
+            width: 100%;
+            margin: 0 auto;
+            padding: 0;
+        }
+        canvas {
+            display: block;
+            max-width: 100%;
+            height: auto !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="chart-container">
+        <canvas id="deviceChart"></canvas>
+    </div>
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const pcCount = parseFloat(urlParams.get('pc') || '15800');
+        const mobileCount = parseFloat(urlParams.get('mobile') || '122500');
+        
+        const total = pcCount + mobileCount;
+        const pcRatio = (pcCount / total * 100).toFixed(2);
+        const mobileRatio = (mobileCount / total * 100).toFixed(2);
+        
+        const ctx = document.getElementById('deviceChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['PC', '모바일'],
+                datasets: [{
+                    data: [pcRatio, mobileRatio],
+                    backgroundColor: ['#5B9BD5', '#70AD47'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                aspectRatio: 1.5,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.label + ': ' + context.parsed.toFixed(2) + '%';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
