@@ -20,37 +20,41 @@ export default async function handler(req, res) {
   try {
     const timestamp = Date.now().toString();
     
-    // Base64 디코딩
-    const base64ToArrayBuffer = (base64) => {
+    // Base64 디코딩 함수
+    function base64ToBytes(base64) {
       const binaryString = atob(base64);
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {
         bytes[i] = binaryString.charCodeAt(i);
       }
-      return bytes.buffer;
-    };
+      return bytes;
+    }
     
-    // SECRET_KEY를 Base64 디코딩
-    const keyData = base64ToArrayBuffer(SECRET_KEY);
-    const messageData = new TextEncoder().encode(`${timestamp}.${ACCESS_LICENSE}`);
+    // Signature = Base64(HMAC-SHA256(Secret-Key, timestamp + "." + access-license))
+    const message = `${timestamp}.${ACCESS_LICENSE}`;
+    const messageBytes = new TextEncoder().encode(message);
+    const secretKeyBytes = base64ToBytes(SECRET_KEY);
     
+    // HMAC-SHA256
     const cryptoKey = await crypto.subtle.importKey(
       'raw',
-      keyData,
-      { name: 'HMAC', hash: 'SHA-256' },
+      secretKeyBytes,
+      { name: 'HMAC', hash: { name: 'SHA-256' } },
       false,
       ['sign']
     );
     
-    const signatureBuffer = await crypto.subtle.sign(
+    const signatureBytes = await crypto.subtle.sign(
       'HMAC',
       cryptoKey,
-      messageData
+      messageBytes
     );
     
-    const signatureArray = Array.from(new Uint8Array(signatureBuffer));
-    const signatureBase64 = btoa(String.fromCharCode(...signatureArray));
+    // Base64 인코딩
+    const signatureArray = Array.from(new Uint8Array(signatureBytes));
+    const signature = btoa(String.fromCharCode.apply(null, signatureArray));
 
+    // 네이버 광고 API 호출
     const response = await fetch(
       'https://api.naver.com/keywordstool',
       {
@@ -59,7 +63,7 @@ export default async function handler(req, res) {
           'X-API-KEY': ACCESS_LICENSE,
           'X-Customer': CUSTOMER_ID,
           'X-Timestamp': timestamp,
-          'X-Signature': signatureBase64,
+          'X-Signature': signature,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -71,11 +75,21 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Naver API error: ${response.status} - ${errorText}`);
+      return res.status(response.status).json({ 
+        error: 'Naver API error',
+        status: response.status,
+        detail: errorText,
+        debugInfo: {
+          timestamp,
+          signature,
+          message
+        }
+      });
     }
 
     const data = await response.json();
     
+    // 상위 50개 중 검색량 높은 20개 선택
     if (data.keywordList && data.keywordList.length > 0) {
       let keywords = data.keywordList.slice(0, 50);
       
@@ -98,7 +112,8 @@ export default async function handler(req, res) {
   } catch (error) {
     return res.status(500).json({ 
       error: 'API call failed',
-      message: error.message 
+      message: error.message,
+      stack: error.stack
     });
   }
 }
