@@ -26,14 +26,7 @@ export default async function handler(req, res) {
   const endDateStr = endDate.toISOString().slice(0, 10);
 
   try {
-    // 1. 전체 데이터
-    const totalData = await fetchData(keyword, startDateStr, endDateStr, CLIENT_ID, CLIENT_SECRET);
-    
-    // 2. 성별 데이터
-    const femaleData = await fetchData(keyword, startDateStr, endDateStr, CLIENT_ID, CLIENT_SECRET, { gender: 'f' });
-    const maleData = await fetchData(keyword, startDateStr, endDateStr, CLIENT_ID, CLIENT_SECRET, { gender: 'm' });
-    
-    // 3. 연령별 데이터
+    // 🚀 병렬 처리: 모든 API를 동시에 호출!
     const ageGroups = [
       { label: '0-12세', ages: ['1'] },
       { label: '13-18세', ages: ['2'] },
@@ -47,15 +40,21 @@ export default async function handler(req, res) {
       { label: '55-59세', ages: ['10'] },
       { label: '60세+', ages: ['11'] }
     ];
-    
-    const ageData = [];
-    for (const group of ageGroups) {
-      const data = await fetchData(keyword, startDateStr, endDateStr, CLIENT_ID, CLIENT_SECRET, { ages: group.ages });
-      ageData.push({
-        label: group.label,
-        data: data
-      });
-    }
+
+    // 전체, 성별, 연령별을 한 번에 호출 (Promise.all)
+    const [totalData, femaleData, maleData, ...ageDataResults] = await Promise.all([
+      fetchData(keyword, startDateStr, endDateStr, CLIENT_ID, CLIENT_SECRET),
+      fetchData(keyword, startDateStr, endDateStr, CLIENT_ID, CLIENT_SECRET, { gender: 'f' }),
+      fetchData(keyword, startDateStr, endDateStr, CLIENT_ID, CLIENT_SECRET, { gender: 'm' }),
+      ...ageGroups.map(group => 
+        fetchData(keyword, startDateStr, endDateStr, CLIENT_ID, CLIENT_SECRET, { ages: group.ages })
+      )
+    ]);
+
+    const ageData = ageGroups.map((group, index) => ({
+      label: group.label,
+      data: ageDataResults[index]
+    }));
 
     // 변동율 계산 (전체 데이터 기준)
     const allData = totalData.results[0].data;
