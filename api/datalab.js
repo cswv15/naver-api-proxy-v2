@@ -9,7 +9,7 @@ export default async function handler(req, res) {
 
   const keyword = req.query.keyword || req.body?.keyword;
   const monthlyTotal = req.query.monthlyTotal || req.body?.monthlyTotal;
-  const aggregation = req.query.aggregation || 'daily';
+  const aggregation = req.query.aggregation || 'monthly';  // 기본값 monthly로 변경
   
   if (!keyword) {
     return res.status(400).json({ error: 'keyword is required' });
@@ -27,14 +27,14 @@ export default async function handler(req, res) {
 
   try {
     // 🚀 병렬 처리: 모든 API를 동시에 호출!
-const ageGroups = [
-  { label: '0-18세', ages: ['1', '2'] },           // 0-12 + 13-18
-  { label: '19-29세', ages: ['3', '4'] },          // 19-24 + 25-29
-  { label: '30-39세', ages: ['5', '6'] },          // 30-34 + 35-39
-  { label: '40-49세', ages: ['7', '8'] },          // 40-44 + 45-49
-  { label: '50-59세', ages: ['9', '10'] },         // 50-54 + 55-59
-  { label: '60세+', ages: ['11'] }                 // 60+
-];
+    const ageGroups = [
+      { label: '0-18세', ages: ['1', '2'] },           // 0-12 + 13-18
+      { label: '19-29세', ages: ['3', '4'] },          // 19-24 + 25-29
+      { label: '30-39세', ages: ['5', '6'] },          // 30-34 + 35-39
+      { label: '40-49세', ages: ['7', '8'] },          // 40-44 + 45-49
+      { label: '50-59세', ages: ['9', '10'] },         // 50-54 + 55-59
+      { label: '60세+', ages: ['11'] }                 // 60+
+    ];
 
     // 전체, 성별, 연령별을 한 번에 호출 (Promise.all)
     const [totalData, femaleData, maleData, ...ageDataResults] = await Promise.all([
@@ -51,48 +51,53 @@ const ageGroups = [
       data: ageDataResults[index]
     }));
 
-    // 변동율 계산 (전체 데이터 기준)
+    // 변동율 계산 (월별 데이터 기준)
     const allData = totalData.results[0].data;
-    const last30Days = allData.slice(-30);
-    const last30DaysSum = last30Days.reduce((sum, item) => sum + item.ratio, 0);
     
-    const previous30Days = allData.slice(-60, -30);
-    const previous30DaysSum = previous30Days.reduce((sum, item) => sum + item.ratio, 0);
+    // 최근 1개월
+    const lastMonth = allData.slice(-1);
+    const lastMonthSum = lastMonth.reduce((sum, item) => sum + item.ratio, 0);
     
-    const last3Months = allData.slice(-90);
+    // 이전 1개월
+    const previousMonth = allData.slice(-2, -1);
+    const previousMonthSum = previousMonth.reduce((sum, item) => sum + item.ratio, 0);
+    
+    // 최근 3개월 평균
+    const last3Months = allData.slice(-3);
     const last3MonthsAvg = last3Months.reduce((sum, item) => sum + item.ratio, 0) / 3;
     
-    const last6Months = allData.slice(-180);
+    // 최근 6개월 평균
+    const last6Months = allData.slice(-6);
     const last6MonthsAvg = last6Months.reduce((sum, item) => sum + item.ratio, 0) / 6;
     
-    const changeRate1Month = previous30DaysSum > 0 
-      ? parseFloat(((last30DaysSum - previous30DaysSum) / previous30DaysSum * 100).toFixed(2)) 
+    const changeRate1Month = previousMonthSum > 0 
+      ? parseFloat(((lastMonthSum - previousMonthSum) / previousMonthSum * 100).toFixed(2)) 
       : 0;
     
     const changeRate3Months = last3MonthsAvg > 0 
-      ? parseFloat(((last30DaysSum - last3MonthsAvg) / last3MonthsAvg * 100).toFixed(2)) 
+      ? parseFloat(((lastMonthSum - last3MonthsAvg) / last3MonthsAvg * 100).toFixed(2)) 
       : 0;
     
     const changeRate6Months = last6MonthsAvg > 0 
-      ? parseFloat(((last30DaysSum - last6MonthsAvg) / last6MonthsAvg * 100).toFixed(2)) 
+      ? parseFloat(((lastMonthSum - last6MonthsAvg) / last6MonthsAvg * 100).toFixed(2)) 
       : 0;
 
-    // 성별 비율 계산 (최근 30일 기준)
-    const femaleLast30 = femaleData.results[0].data.slice(-30).reduce((sum, item) => sum + item.ratio, 0);
-    const maleLast30 = maleData.results[0].data.slice(-30).reduce((sum, item) => sum + item.ratio, 0);
-    const genderTotal = femaleLast30 + maleLast30;
+    // 성별 비율 계산 (최근 1개월 기준)
+    const femaleLast = femaleData.results[0].data.slice(-1).reduce((sum, item) => sum + item.ratio, 0);
+    const maleLast = maleData.results[0].data.slice(-1).reduce((sum, item) => sum + item.ratio, 0);
+    const genderTotal = femaleLast + maleLast;
     
     const genderRatio = {
-      female: genderTotal > 0 ? parseFloat((femaleLast30 / genderTotal * 100).toFixed(2)) : 0,
-      male: genderTotal > 0 ? parseFloat((maleLast30 / genderTotal * 100).toFixed(2)) : 0
+      female: genderTotal > 0 ? parseFloat((femaleLast / genderTotal * 100).toFixed(2)) : 0,
+      male: genderTotal > 0 ? parseFloat((maleLast / genderTotal * 100).toFixed(2)) : 0
     };
 
-    // 연령별 비율 계산 (최근 30일 기준)
+    // 연령별 비율 계산 (최근 1개월 기준)
     const ageRatios = [];
     let ageTotal = 0;
     
     for (const group of ageData) {
-      const sum = group.data.results[0].data.slice(-30).reduce((sum, item) => sum + item.ratio, 0);
+      const sum = group.data.results[0].data.slice(-1).reduce((sum, item) => sum + item.ratio, 0);
       ageTotal += sum;
       ageRatios.push({ label: group.label, sum });
     }
@@ -102,63 +107,27 @@ const ageGroups = [
       ratio: ageTotal > 0 ? parseFloat((item.sum / ageTotal * 100).toFixed(2)) : 0
     }));
 
-    // 절대값 계산 및 월별 집계
+    // 절대값 계산
     if (monthlyTotal) {
-      const calibrationFactor = parseFloat(monthlyTotal) / last30DaysSum;
+      const calibrationFactor = parseFloat(monthlyTotal) / lastMonthSum;
       
       const dataWithAbsolute = allData.map(item => {
-        const [year, month, day] = item.period.split('-');
-        const label = day === '01' ? `${year}년 ${parseInt(month)}월` : '';
+        const [year, month] = item.period.split('-');
         
         return {
-          ...item,
+          period: item.period,
           absoluteValue: Math.round(item.ratio * calibrationFactor),
-          label: label,
-          yearMonth: `${year}-${month}`
+          label: `${year}년 ${parseInt(month)}월`,
+          daysCount: 30  // 월별이므로 근사값
         };
       });
-      
-      if (aggregation === 'monthly') {
-        const monthlyData = {};
-        
-        dataWithAbsolute.forEach(item => {
-          if (!monthlyData[item.yearMonth]) {
-            monthlyData[item.yearMonth] = {
-              period: item.yearMonth,
-              absoluteValues: [],
-              year: item.yearMonth.split('-')[0],
-              month: item.yearMonth.split('-')[1]
-            };
-          }
-          monthlyData[item.yearMonth].absoluteValues.push(item.absoluteValue);
-        });
-        
-        const monthlyResult = Object.values(monthlyData).map(month => ({
-          period: month.period,
-          absoluteValue: Math.round(
-            month.absoluteValues.reduce((sum, val) => sum + val, 0)
-          ),
-          label: `${month.year}년 ${parseInt(month.month)}월`,
-          daysCount: month.absoluteValues.length
-        }));
 
-        if (monthlyResult.length > 0 && monthlyResult[0].daysCount < 27) {
-          monthlyResult.shift();
-        }
-
-        totalData.results[0].data = monthlyResult;
-      } else {
-        totalData.results[0].data = dataWithAbsolute.map(item => ({
-          period: item.period,
-          absoluteValue: item.absoluteValue,
-          label: item.label
-        }));
-      }
+      totalData.results[0].data = dataWithAbsolute;
     }
     
     return res.status(200).json({
       ...totalData,
-      last30DaysSum,
+      last30DaysSum: lastMonthSum,  // 최근 1개월 합계
       changeRate1Month,
       changeRate3Months,
       changeRate6Months,
@@ -178,7 +147,7 @@ async function fetchData(keyword, startDate, endDate, clientId, clientSecret, fi
   const body = {
     startDate,
     endDate,
-    timeUnit: 'date',
+    timeUnit: 'month',  // month로 변경!
     keywordGroups: [
       {
         groupName: keyword,
