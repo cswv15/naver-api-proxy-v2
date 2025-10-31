@@ -13,18 +13,29 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'hintKeywords is required' });
   }
 
-  const CLIENT_ID = 'tAqrvpUoITtELJyoFdWM';
-  const CLIENT_SECRET = 'H5FMEkWjBm';
+  const CUSTOMER_ID = '2865372';
+  const ACCESS_LICENSE = '0100000000b4a432729b7e7e42b6b9f87f73bac533ae2b1f4e7ee5eccbe9de62ffbedffcb5';
+  const SECRET_KEY = 'AQAAAAC0pDJym35+Qra5+H9zusUzvalNeyb5aw8coXWCCPPFpg==';
 
   try {
-    // POST로 변경하고 body에 데이터 전송
+    const timestamp = Date.now().toString();
+    
+    // HMAC SHA256 서명 생성
+    const crypto = await import('crypto');
+    const hmac = crypto.createHmac('sha256', SECRET_KEY);
+    hmac.update(`${timestamp}.${ACCESS_LICENSE}`);
+    const signature = hmac.digest('base64');
+
     const response = await fetch(
       'https://api.naver.com/keywordstool',
       {
         method: 'POST',
         headers: {
-          'X-Naver-Client-Id': CLIENT_ID,
-          'X-Naver-Client-Secret': CLIENT_SECRET,
+          'X-Naver-Client-Id': ACCESS_LICENSE,
+          'X-API-KEY': ACCESS_LICENSE,
+          'X-Customer': CUSTOMER_ID,
+          'X-Timestamp': timestamp,
+          'X-Signature': signature,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -35,16 +46,15 @@ export default async function handler(req, res) {
     );
 
     if (!response.ok) {
-      throw new Error(`Naver API error: ${response.status}`);
+      const errorText = await response.text();
+      throw new Error(`Naver API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
     
     if (data.keywordList && data.keywordList.length > 0) {
-      // 1. 상위 50개만 가져오기
       let keywords = data.keywordList.slice(0, 50);
       
-      // 2. 검색량 높은 순으로 정렬
       keywords.sort((a, b) => {
         const getValue = (val) => {
           if (typeof val === 'string' && val.includes('<')) return 0;
@@ -56,7 +66,6 @@ export default async function handler(req, res) {
         return totalB - totalA;
       });
       
-      // 3. 상위 20개만 반환
       data.keywordList = keywords.slice(0, 20);
     }
 
