@@ -20,10 +20,19 @@ export default async function handler(req, res) {
   try {
     const timestamp = Date.now().toString();
     
-    // Web Crypto API로 서명 생성
-    const encoder = new TextEncoder();
-    const keyData = encoder.encode(SECRET_KEY);
-    const messageData = encoder.encode(`${timestamp}.${ACCESS_LICENSE}`);
+    // Base64 디코딩
+    const base64ToArrayBuffer = (base64) => {
+      const binaryString = atob(base64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return bytes.buffer;
+    };
+    
+    // SECRET_KEY를 Base64 디코딩
+    const keyData = base64ToArrayBuffer(SECRET_KEY);
+    const messageData = new TextEncoder().encode(`${timestamp}.${ACCESS_LICENSE}`);
     
     const cryptoKey = await crypto.subtle.importKey(
       'raw',
