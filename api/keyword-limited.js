@@ -17,17 +17,26 @@ export default async function handler(req, res) {
   const CLIENT_SECRET = 'H5FMEkWjBm';
 
   try {
+    // POST로 변경하고 body에 데이터 전송
     const response = await fetch(
       'https://api.naver.com/keywordstool',
       {
-        method: 'GET',
+        method: 'POST',
         headers: {
           'X-Naver-Client-Id': CLIENT_ID,
           'X-Naver-Client-Secret': CLIENT_SECRET,
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({
+          hintKeywords: hintKeywords,
+          showDetail: 1
+        })
       }
     );
+
+    if (!response.ok) {
+      throw new Error(`Naver API error: ${response.status}`);
+    }
 
     const data = await response.json();
     
