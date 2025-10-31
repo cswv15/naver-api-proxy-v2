@@ -19,9 +19,9 @@ export default async function handler(req, res) {
 
   try {
     const timestamp = Date.now().toString();
+    const crypto = require('crypto');
     
-    // HMAC SHA256 서명 생성
-    const crypto = await import('crypto');
+    // Signature 생성
     const hmac = crypto.createHmac('sha256', SECRET_KEY);
     hmac.update(`${timestamp}.${ACCESS_LICENSE}`);
     const signature = hmac.digest('base64');
@@ -31,7 +31,6 @@ export default async function handler(req, res) {
       {
         method: 'POST',
         headers: {
-          'X-Naver-Client-Id': ACCESS_LICENSE,
           'X-API-KEY': ACCESS_LICENSE,
           'X-Customer': CUSTOMER_ID,
           'X-Timestamp': timestamp,
