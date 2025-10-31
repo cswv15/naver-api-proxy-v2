@@ -27,19 +27,14 @@ export default async function handler(req, res) {
 
   try {
     // 🚀 병렬 처리: 모든 API를 동시에 호출!
-    const ageGroups = [
-      { label: '0-12세', ages: ['1'] },
-      { label: '13-18세', ages: ['2'] },
-      { label: '19-24세', ages: ['3'] },
-      { label: '25-29세', ages: ['4'] },
-      { label: '30-34세', ages: ['5'] },
-      { label: '35-39세', ages: ['6'] },
-      { label: '40-44세', ages: ['7'] },
-      { label: '45-49세', ages: ['8'] },
-      { label: '50-54세', ages: ['9'] },
-      { label: '55-59세', ages: ['10'] },
-      { label: '60세+', ages: ['11'] }
-    ];
+const ageGroups = [
+  { label: '0-18세', ages: ['1', '2'] },           // 0-12 + 13-18
+  { label: '19-29세', ages: ['3', '4'] },          // 19-24 + 25-29
+  { label: '30-39세', ages: ['5', '6'] },          // 30-34 + 35-39
+  { label: '40-49세', ages: ['7', '8'] },          // 40-44 + 45-49
+  { label: '50-59세', ages: ['9', '10'] },         // 50-54 + 55-59
+  { label: '60세+', ages: ['11'] }                 // 60+
+];
 
     // 전체, 성별, 연령별을 한 번에 호출 (Promise.all)
     const [totalData, femaleData, maleData, ...ageDataResults] = await Promise.all([
