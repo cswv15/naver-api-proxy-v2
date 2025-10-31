@@ -19,12 +19,28 @@ export default async function handler(req, res) {
 
   try {
     const timestamp = Date.now().toString();
-    const crypto = require('crypto');
     
-    // Signature 생성
-    const hmac = crypto.createHmac('sha256', SECRET_KEY);
-    hmac.update(`${timestamp}.${ACCESS_LICENSE}`);
-    const signature = hmac.digest('base64');
+    // Web Crypto API로 서명 생성
+    const encoder = new TextEncoder();
+    const keyData = encoder.encode(SECRET_KEY);
+    const messageData = encoder.encode(`${timestamp}.${ACCESS_LICENSE}`);
+    
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw',
+      keyData,
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+    
+    const signatureBuffer = await crypto.subtle.sign(
+      'HMAC',
+      cryptoKey,
+      messageData
+    );
+    
+    const signatureArray = Array.from(new Uint8Array(signatureBuffer));
+    const signatureBase64 = btoa(String.fromCharCode(...signatureArray));
 
     const response = await fetch(
       'https://api.naver.com/keywordstool',
@@ -34,7 +50,7 @@ export default async function handler(req, res) {
           'X-API-KEY': ACCESS_LICENSE,
           'X-Customer': CUSTOMER_ID,
           'X-Timestamp': timestamp,
-          'X-Signature': signature,
+          'X-Signature': signatureBase64,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
