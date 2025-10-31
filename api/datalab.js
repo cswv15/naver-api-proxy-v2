@@ -15,8 +15,8 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'keyword is required' });
   }
 
-  const CLIENT_ID = '2KmBNl2qXg7vRy_lD0DJ';
-  const CLIENT_SECRET = '9cB78MrhD6';
+  const CLIENT_ID = 'QIgM5M8MCncMBw_GoYPq';
+  const CLIENT_SECRET = 'ic4x5GOhKB';
 
   const endDate = new Date();
   const startDate = new Date();
