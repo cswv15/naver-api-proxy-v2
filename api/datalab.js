@@ -1,8 +1,8 @@
 // /api/datalab.js
 // ✅ 기능 요약
-// - 데이터랩 호출 최적화: 성별(f/m) 2회 + 연령 6그룹(0-18, 19-29, 30-39, 40-49, 50-59, 60+) 6회 = 총 8회
+// - 데이터랩 호출 최적화: 전체 1회 + 성별(f/m) 2회 + 연령 6그룹 6회 = 총 9회
 // - 호출 분산: 여러 Client ID/Secret 라운드로빈 + 429/401/403 시 다음 키로 페일오버
-// - 캐시: 24시간 TTL, 요청 시 만료 확인 (외부 크론 불필요)
+// - 캐시: 24시간 TTL, 요청 시 만료 확인
 // - 중복 가드: 8초 내 동일 키워드 429
 // - 동시성 제한: 최대 2개씩만 병렬
 
@@ -32,9 +32,6 @@ function limiter(max = 2) {
 const runLimited = limiter(2);
 
 // ----------------- 키 로테이션 -----------------
-// 환경변수 예시 (Vercel):
-// NAVER_KEYS='[{"id":"CID_1","secret":"SEC_1"},{"id":"CID_2","secret":"SEC_2"}]'
-// 또는 NAVER_KEYS 안쓰면 단일 키 사용: NAVER_CLIENT_ID / NAVER_CLIENT_SECRET
 let KEY_POOL = [];
 try {
   if (process.env.NAVER_KEYS) {
@@ -43,7 +40,6 @@ try {
     KEY_POOL = [{ id: process.env.NAVER_CLIENT_ID, secret: process.env.NAVER_CLIENT_SECRET }];
   }
 } catch (_) {
-  // invalid JSON -> fallback to single env pair
   if (process.env.NAVER_CLIENT_ID && process.env.NAVER_CLIENT_SECRET) {
     KEY_POOL = [{ id: process.env.NAVER_CLIENT_ID, secret: process.env.NAVER_CLIENT_SECRET }];
   }
@@ -53,28 +49,26 @@ if (!Array.isArray(KEY_POOL) || KEY_POOL.length === 0) {
   KEY_POOL = [];
 }
 
-let rrIndex = Math.floor(Math.random() * Math.max(1, KEY_POOL.length)); // 랜덤 시작
-const cooldown = new Map(); // keyIndex -> untilTs
+let rrIndex = Math.floor(Math.random() * Math.max(1, KEY_POOL.length));
+const cooldown = new Map();
 
 function isCooling(i) {
   const until = cooldown.get(i);
   return until && until > Date.now();
 }
-function markCooldown(i, ms = 60_000) { // 기본 60초 쿨다운
+function markCooldown(i, ms = 60_000) {
   cooldown.set(i, Date.now() + ms);
 }
 function pickKey() {
   if (KEY_POOL.length === 0) throw new Error('No DataLab keys configured');
-  // 라운드로빈으로 다음 사용 가능 키 선택
   for (let step = 0; step < KEY_POOL.length; step++) {
     const idx = (rrIndex + step) % KEY_POOL.length;
     if (!isCooling(idx)) {
-      console.log(`[DataLab] Using key #${idx}`); // 로그 추가
+      console.log(`[DataLab] Using key #${idx}`);
       rrIndex = (idx + 1) % KEY_POOL.length;
       return { idx, key: KEY_POOL[idx] };
     }
   }
-  // 모두 쿨다운이면 가장 먼저 끝나는 걸 사용(어차피 실패 가능성 ↑)
   const idx = (rrIndex++) % KEY_POOL.length;
   return { idx, key: KEY_POOL[idx] };
 }
@@ -93,27 +87,25 @@ async function dlFetchWithRotation(body) {
         },
         body: JSON.stringify(body),
       });
-      if (r.status === 429) { // rate limit
-        console.log(`[DataLab] Key #${idx} rate limited (429), switching...`); // 로그 추가
-        markCooldown(idx); // 60초 냉각
+      if (r.status === 429) {
+        console.log(`[DataLab] Key #${idx} rate limited (429), switching...`);
+        markCooldown(idx);
         lastErr = new Error('429 Too Many Requests');
-        continue; // 다음 키로
+        continue;
       }
-      if (r.status === 401 || r.status === 403) { // 인증/권한
-        console.log(`[DataLab] Key #${idx} auth error (${r.status}), switching...`); // 로그 추가
-        markCooldown(idx, 5 * 60_000); // 5분 냉각
+      if (r.status === 401 || r.status === 403) {
+        console.log(`[DataLab] Key #${idx} auth error (${r.status}), switching...`);
+        markCooldown(idx, 5 * 60_000);
         lastErr = new Error(`${r.status} Auth/Permission`);
-        continue; // 다음 키로
+        continue;
       }
       if (!r.ok) {
-        // 기타 실패는 키 문제 아닐 수 있음 -> 바로 throw
         throw new Error(`DataLab ${r.status}`);
       }
       return r.json();
     } catch (e) {
       lastErr = e;
-      // 네트워크 에러 등 -> 다음 키 시도
-      console.log(`[DataLab] Key #${idx} network error, switching...`); // 로그 추가
+      console.log(`[DataLab] Key #${idx} network error, switching...`);
       markCooldown(idx, 30_000);
       continue;
     }
@@ -138,8 +130,8 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers','Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // GET/POST 둘 다 지원
   const keyword = (req.query.keyword || req.body?.keyword || '').trim();
+  const monthlyTotal = req.query.monthlyTotal || req.body?.monthlyTotal;
   const timeUnit = req.query.timeUnit || req.body?.timeUnit || 'month';
   if (!keyword) return res.status(400).json({ error: 'keyword is required' });
 
@@ -154,7 +146,7 @@ export default async function handler(req, res) {
     keywordGroups: [{ groupName: keyword, keywords: [keyword] }],
   };
 
-  const key = JSON.stringify({ k: keyword.toLowerCase(), timeUnit, v: 'g6+rot' });
+  const key = JSON.stringify({ k: keyword.toLowerCase(), timeUnit, mt: monthlyTotal || '', v: 'g6+rot+trend' });
   const dupKey = key;
 
   // 중복 가드(8초)
@@ -169,6 +161,9 @@ export default async function handler(req, res) {
   }
 
   const task = (async () => {
+    // 전체 데이터 1회 (트렌드용)
+    const totalRes = await runLimited(() => dlFetchWithRotation(baseBody));
+    
     // 성별 2회
     const fRes = await runLimited(() => dlFetchWithRotation({ ...baseBody, gender: 'f' }));
     const mRes = await runLimited(() => dlFetchWithRotation({ ...baseBody, gender: 'm' }));
@@ -180,11 +175,56 @@ export default async function handler(req, res) {
       ageResults.push({ label: grp.label, data: r });
     }
 
-    // 최근 30포인트 합 기준 비율 계산
+    // 최근 30포인트(또는 12개월) 합 기준 비율 계산
     const genderRatio = calcGenderRatio(fRes, mRes);
     const ageRatios = calcAgeRatios(ageResults);
+    
+    // 변동율 계산
+    const allData = totalRes.results[0].data;
+    const lastMonth = allData.slice(-1);
+    const lastMonthSum = lastMonth.reduce((s, x) => s + (x.ratio || 0), 0);
+    const previousMonth = allData.slice(-2, -1);
+    const previousMonthSum = previousMonth.reduce((s, x) => s + (x.ratio || 0), 0);
+    const last3Months = allData.slice(-3);
+    const last3MonthsAvg = last3Months.reduce((s, x) => s + (x.ratio || 0), 0) / 3;
+    const last6Months = allData.slice(-6);
+    const last6MonthsAvg = last6Months.reduce((s, x) => s + (x.ratio || 0), 0) / 6;
+    
+    const changeRate1Month = previousMonthSum > 0 
+      ? parseFloat(((lastMonthSum - previousMonthSum) / previousMonthSum * 100).toFixed(2)) 
+      : 0;
+    const changeRate3Months = last3MonthsAvg > 0 
+      ? parseFloat(((lastMonthSum - last3MonthsAvg) / last3MonthsAvg * 100).toFixed(2)) 
+      : 0;
+    const changeRate6Months = last6MonthsAvg > 0 
+      ? parseFloat(((lastMonthSum - last6MonthsAvg) / last6MonthsAvg * 100).toFixed(2)) 
+      : 0;
 
-    const out = { genderRatio, ageRatios };
+    // 절대값 계산
+    if (monthlyTotal) {
+      const calibrationFactor = parseFloat(monthlyTotal) / lastMonthSum;
+      const dataWithAbsolute = allData.map(item => {
+        const [year, month] = item.period.split('-');
+        return {
+          period: item.period,
+          absoluteValue: Math.round(item.ratio * calibrationFactor),
+          label: `${year}년 ${parseInt(month)}월`,
+          daysCount: 30
+        };
+      });
+      totalRes.results[0].data = dataWithAbsolute;
+    }
+
+    const out = {
+      ...totalRes,
+      last30DaysSum: lastMonthSum,
+      changeRate1Month,
+      changeRate3Months,
+      changeRate6Months,
+      genderRatio,
+      ageRatios
+    };
+    
     setCache(key, out);
     recent.set(dupKey, Date.now());
     return out;
