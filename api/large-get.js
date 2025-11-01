@@ -18,8 +18,8 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'keywords array is empty' });
     }
     
-    if (keywords.length > 100) {
-      keywords = keywords.slice(0, 100);
+    if (keywords.length > 200) {
+      keywords = keywords.slice(0, 200);
     }
 
     const results = [];
