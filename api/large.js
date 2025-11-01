@@ -22,6 +22,11 @@ export default async function handler(req, res) {
   const CUSTOMER_ID = process.env.NAVER_CUSTOMER_ID;
 
   if (!CLIENT_ID || !CLIENT_SECRET || !CUSTOMER_ID) {
+    console.error('Missing env vars:', { 
+      hasClientId: !!CLIENT_ID, 
+      hasClientSecret: !!CLIENT_SECRET, 
+      hasCustomerId: !!CUSTOMER_ID 
+    });
     return res.status(500).json({ error: 'Server configuration error' });
   }
 
@@ -131,3 +136,19 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: error.message });
   }
 }
+```
+
+---
+
+## 단계:
+
+### 1. GitHub Repository로 이동
+**naver-api-proxy-v2**
+
+### 2. api 폴더 클릭
+
+### 3. "Add file" → "Create new file"
+
+### 4. 파일명 입력:
+```
+large.js
