@@ -3,36 +3,45 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
-
-  console.log('Received body:', JSON.stringify(req.body));
-
-  let keywords = req.body?.keywords;
-  
-  // 어떤 형식이든 배열로 변환
-  if (!keywords) {
-    return res.status(400).json({ error: 'keywords is required' });
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
   }
   
-  if (typeof keywords === 'string') {
-    keywords = keywords.split('\n').filter(k => k && k.trim()).map(k => k.trim());
-  }
-  
-  if (!Array.isArray(keywords)) {
-    keywords = [keywords];
-  }
-  
-  keywords = keywords.filter(k => k && k.trim()).map(k => k.trim());
-  
-  if (keywords.length === 0) {
-    return res.status(400).json({ error: 'keywords array is empty after filtering' });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'POST only' });
   }
 
-  const results = [];
-  
   try {
-    for (let i = 0; i < Math.min(keywords.length, 100); i++) {
+    let keywords = req.body?.keywords;
+    
+    if (!keywords) {
+      return res.status(400).json({ error: 'keywords is required' });
+    }
+    
+    // 문자열이면 배열로 변환
+    if (typeof keywords === 'string') {
+      keywords = keywords.split('\n').filter(k => k && k.trim()).map(k => k.trim());
+    }
+    
+    // 배열이 아니면 배열로 만들기
+    if (!Array.isArray(keywords)) {
+      keywords = [String(keywords)];
+    }
+    
+    // 빈 값 제거
+    keywords = keywords.filter(k => k && String(k).trim()).map(k => String(k).trim());
+    
+    if (keywords.length === 0) {
+      return res.status(400).json({ error: 'keywords array is empty' });
+    }
+    
+    if (keywords.length > 100) {
+      return res.status(400).json({ error: 'Maximum 100 keywords allowed' });
+    }
+
+    const results = [];
+    
+    for (let i = 0; i < keywords.length; i++) {
       const keyword = keywords[i];
       
       try {
@@ -88,13 +97,15 @@ export default async function handler(req, res) {
           });
         }
 
+        // Rate limit 방지
         if (i < keywords.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 200));
         }
+
       } catch (error) {
         results.push({
           keyword,
-          error: error.message,
+          error: error.message || 'Processing error',
           relKeyword: keyword,
           monthlyPcQcCnt: 0,
           monthlyMobileQcCnt: 0,
@@ -114,23 +125,13 @@ export default async function handler(req, res) {
       success: results.filter(r => !r.error).length,
       failed: results.filter(r => r.error).length,
     });
+
   } catch (error) {
+    console.error('Large search error:', error);
     return res.status(500).json({ 
       error: 'Server error',
-      message: error.message
+      message: error.message,
+      stack: error.stack
     });
   }
 }
-```
-
-**Commit → Vercel 배포 대기 (1-2분)**
-
----
-
-### 2단계: Bubble Workflow Step 2 수정
-
-**Workflow → Step 2 (LargeSearch - SearchKeywords):**
-
-**keywords 파라미터를:**
-```
-input-keywords's value
