@@ -103,7 +103,7 @@ export default async function handler(req, res) {
 
         // 청크 사이 대기
         if (i + chunkSize < keywords.length) {
-          await new Promise(resolve => setTimeout(resolve, 200));
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
 
       } catch (error) {
