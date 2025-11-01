@@ -22,27 +22,10 @@ export default async function handler(req, res) {
       keywords = keywords.slice(0, 100);
     }
 
-    // 네이버 광고 API 직접 호출
-    const CLIENT_ID = process.env.NAVER_AD_ID;
-    const CLIENT_SECRET = process.env.NAVER_AD_PW;
-    const CUSTOMER_ID = process.env.NAVER_CUSTOMER_ID;
-
-    if (!CLIENT_ID || !CLIENT_SECRET || !CUSTOMER_ID) {
-      return res.status(500).json({ error: 'Server configuration error' });
-    }
-
     const fetchKeyword = async (keyword) => {
       try {
-        // 네이버 API 직접 호출
-        const apiUrl = `https://api.naver.com/keywordstool?hintKeywords=${encodeURIComponent(keyword)}&showDetail=1`;
-        const response = await fetch(apiUrl, {
-          method: 'GET',
-          headers: {
-            'X-Naver-Client-Id': CLIENT_ID,
-            'X-Naver-Client-Secret': CLIENT_SECRET,
-            'X-Customer': CUSTOMER_ID,
-          },
-        });
+        const apiUrl = `https://naver-api-proxy-v2.vercel.app/api?keyword=${encodeURIComponent(keyword)}`;
+        const response = await fetch(apiUrl);
 
         if (!response.ok) {
           console.error(`API Error for ${keyword}: ${response.status}`);
@@ -62,8 +45,22 @@ export default async function handler(req, res) {
         }
 
         const data = await response.json();
-        
-        if (!data.keywordList || data.keywordList.length === 0) {
+        const match = data.keywordList?.[0];
+
+        if (match) {
+          return {
+            keyword,
+            relKeyword: match.relKeyword || keyword,
+            monthlyPcQcCnt: match.monthlyPcQcCnt || 0,
+            monthlyMobileQcCnt: match.monthlyMobileQcCnt || 0,
+            monthlyAvePcClkCnt: match.monthlyAvePcClkCnt || 0,
+            monthlyAveMobileClkCnt: match.monthlyAveMobileClkCnt || 0,
+            monthlyAvePcCtr: match.monthlyAvePcCtr || 0,
+            monthlyAveMobileCtr: match.monthlyAveMobileCtr || 0,
+            plAvgDepth: match.plAvgDepth || 0,
+            compIdx: match.compIdx || '-',
+          };
+        } else {
           return {
             keyword,
             error: 'No data found',
@@ -78,25 +75,6 @@ export default async function handler(req, res) {
             compIdx: '-',
           };
         }
-
-        // 정확히 일치하는 키워드 찾기
-        const match = data.keywordList.find(
-          item => item.relKeyword && item.relKeyword.toLowerCase() === keyword.toLowerCase()
-        ) || data.keywordList[0]; // 없으면 첫 번째
-
-        return {
-          keyword,
-          relKeyword: match.relKeyword || keyword,
-          monthlyPcQcCnt: match.monthlyPcQcCnt || 0,
-          monthlyMobileQcCnt: match.monthlyMobileQcCnt || 0,
-          monthlyAvePcClkCnt: match.monthlyAvePcClkCnt || 0,
-          monthlyAveMobileClkCnt: match.monthlyAveMobileClkCnt || 0,
-          monthlyAvePcCtr: match.monthlyAvePcCtr || 0,
-          monthlyAveMobileCtr: match.monthlyAveMobileCtr || 0,
-          plAvgDepth: match.plAvgDepth || 0,
-          compIdx: match.compIdx || '-',
-        };
-
       } catch (error) {
         console.error(`Error processing ${keyword}:`, error);
         return {
@@ -115,8 +93,8 @@ export default async function handler(req, res) {
       }
     };
 
-    // 20개씩 동시 처리
-    const chunkSize = 20;
+    // 5개씩 병렬 처리 (프록시 안정성 고려)
+    const chunkSize = 5;
     const results = [];
     
     for (let i = 0; i < keywords.length; i += chunkSize) {
@@ -124,9 +102,9 @@ export default async function handler(req, res) {
       const chunkResults = await Promise.all(chunk.map(fetchKeyword));
       results.push(...chunkResults);
       
-      // 청크 사이 대기
+      // 청크 사이 충분한 대기
       if (i + chunkSize < keywords.length) {
-        await new Promise(resolve => setTimeout(resolve, 150));
+        await new Promise(resolve => setTimeout(resolve, 300));
       }
     }
 
