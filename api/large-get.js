@@ -6,14 +6,12 @@ export default async function handler(req, res) {
   }
 
   try {
-    // URL 쿼리에서 keywords 가져오기
     const keywordsParam = req.query.keywords;
     
     if (!keywordsParam) {
       return res.status(400).json({ error: 'keywords parameter required' });
     }
     
-    // 쉼표 또는 줄바꿈으로 분리
     let keywords = keywordsParam.split(/[,\n]+/).filter(k => k && k.trim()).map(k => k.trim());
     
     if (keywords.length === 0) {
@@ -24,17 +22,14 @@ export default async function handler(req, res) {
       keywords = keywords.slice(0, 100);
     }
 
-    const results = [];
-    
-    for (let i = 0; i < keywords.length; i++) {
-      const keyword = keywords[i];
-      
+    // 병렬 처리 함수
+    const fetchKeyword = async (keyword) => {
       try {
         const apiUrl = `https://naver-api-proxy-v2.vercel.app/api?keyword=${encodeURIComponent(keyword)}`;
         const response = await fetch(apiUrl);
 
         if (!response.ok) {
-          results.push({
+          return {
             keyword,
             error: `API Error ${response.status}`,
             relKeyword: keyword,
@@ -46,15 +41,14 @@ export default async function handler(req, res) {
             monthlyAveMobileCtr: 0,
             plAvgDepth: 0,
             compIdx: '-',
-          });
-          continue;
+          };
         }
 
         const data = await response.json();
         const match = data.keywordList?.[0];
 
         if (match) {
-          results.push({
+          return {
             keyword,
             relKeyword: match.relKeyword || keyword,
             monthlyPcQcCnt: match.monthlyPcQcCnt || 0,
@@ -65,9 +59,9 @@ export default async function handler(req, res) {
             monthlyAveMobileCtr: match.monthlyAveMobileCtr || 0,
             plAvgDepth: match.plAvgDepth || 0,
             compIdx: match.compIdx || '-',
-          });
+          };
         } else {
-          results.push({
+          return {
             keyword,
             error: 'No data found',
             relKeyword: keyword,
@@ -79,15 +73,10 @@ export default async function handler(req, res) {
             monthlyAveMobileCtr: 0,
             plAvgDepth: 0,
             compIdx: '-',
-          });
+          };
         }
-
-        if (i < keywords.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 200));
-        }
-
       } catch (error) {
-        results.push({
+        return {
           keyword,
           error: error.message,
           relKeyword: keyword,
@@ -99,7 +88,22 @@ export default async function handler(req, res) {
           monthlyAveMobileCtr: 0,
           plAvgDepth: 0,
           compIdx: '-',
-        });
+        };
+      }
+    };
+
+    // 10개씩 묶어서 병렬 처리
+    const chunkSize = 10;
+    const results = [];
+    
+    for (let i = 0; i < keywords.length; i += chunkSize) {
+      const chunk = keywords.slice(i, i + chunkSize);
+      const chunkResults = await Promise.all(chunk.map(fetchKeyword));
+      results.push(...chunkResults);
+      
+      // 각 청크 사이에 짧은 대기 (Rate limit 방지)
+      if (i + chunkSize < keywords.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
 
