@@ -91,8 +91,8 @@ export default async function handler(req, res) {
       }
     };
 
-    // 50개씩 동시 처리 (더 빠르게!)
-    const chunkSize = 50;
+    // 20개씩 동시 처리
+    const chunkSize = 20;
     const results = [];
     
     for (let i = 0; i < keywords.length; i += chunkSize) {
@@ -100,9 +100,9 @@ export default async function handler(req, res) {
       const chunkResults = await Promise.all(chunk.map(fetchKeyword));
       results.push(...chunkResults);
       
-      // 대기 시간 최소화
+      // 청크 사이 대기 (Rate limit 방지)
       if (i + chunkSize < keywords.length) {
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise(resolve => setTimeout(resolve, 150));
       }
     }
 
