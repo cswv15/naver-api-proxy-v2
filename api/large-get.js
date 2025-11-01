@@ -22,7 +22,6 @@ export default async function handler(req, res) {
       keywords = keywords.slice(0, 100);
     }
 
-    // 병렬 처리 함수
     const fetchKeyword = async (keyword) => {
       try {
         const apiUrl = `https://naver-api-proxy-v2.vercel.app/api?keyword=${encodeURIComponent(keyword)}`;
@@ -92,8 +91,8 @@ export default async function handler(req, res) {
       }
     };
 
-    // 10개씩 묶어서 병렬 처리
-    const chunkSize = 10;
+    // 50개씩 동시 처리 (더 빠르게!)
+    const chunkSize = 50;
     const results = [];
     
     for (let i = 0; i < keywords.length; i += chunkSize) {
@@ -101,9 +100,9 @@ export default async function handler(req, res) {
       const chunkResults = await Promise.all(chunk.map(fetchKeyword));
       results.push(...chunkResults);
       
-      // 각 청크 사이에 짧은 대기 (Rate limit 방지)
+      // 대기 시간 최소화
       if (i + chunkSize < keywords.length) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 50));
       }
     }
 
