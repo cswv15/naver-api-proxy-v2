@@ -11,15 +11,20 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'POST only' });
   }
 
+  // keywords 추출 및 배열 변환
   let keywords = req.body?.keywords;
   
-  if (!Array.isArray(keywords)) {
-    return res.status(400).json({ error: 'keywords must be an array' });
+  // 문자열로 왔을 경우 배열로 변환
+  if (typeof keywords === 'string') {
+    keywords = keywords.split('\n').filter(k => k.trim()).map(k => k.trim());
   }
-
-  keywords = keywords.filter(k => k && k.trim()).map(k => k.trim());
-
-  if (keywords.length === 0) {
+  
+  // 이미 배열이면 필터링
+  if (Array.isArray(keywords)) {
+    keywords = keywords.filter(k => k && k.trim()).map(k => k.trim());
+  }
+  
+  if (!keywords || keywords.length === 0) {
     return res.status(400).json({ error: 'keywords array is empty' });
   }
   
@@ -34,7 +39,6 @@ export default async function handler(req, res) {
       const keyword = keywords[i];
       
       try {
-        // 기존 프록시 API 사용
         const apiUrl = `https://naver-api-proxy-v2.vercel.app/api?keyword=${encodeURIComponent(keyword)}`;
         
         const response = await fetch(apiUrl, {
@@ -77,7 +81,6 @@ export default async function handler(req, res) {
           continue;
         }
 
-        // 첫 번째 결과 사용 (가장 관련성 높음)
         const match = data.keywordList[0];
 
         results.push({
@@ -93,7 +96,6 @@ export default async function handler(req, res) {
           compIdx: match.compIdx || '-',
         });
 
-        // Rate limit 방지
         if (i < keywords.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 200));
         }
