@@ -24,43 +24,38 @@ export default async function handler(req, res) {
 
     const results = [];
     
-    // 10개씩 묶어서 한 번에 요청
-    const chunkSize = 10;
+    // 5개씩 묶어서 한 번에 요청
+    const chunkSize = 5;
     
     for (let i = 0; i < keywords.length; i += chunkSize) {
       const chunk = keywords.slice(i, i + chunkSize);
       
       try {
-        // 여러 키워드를 쉼표로 구분해서 한 번에 요청
+        // 5개를 쉼표로 구분해서 한 번에 요청
         const keywordsString = chunk.join(',');
         const apiUrl = `https://naver-api-proxy-v2.vercel.app/api?keyword=${encodeURIComponent(keywordsString)}`;
-        const response = await fetch(apiUrl);
+        
+        const response = await fetch(apiUrl, {
+          signal: AbortSignal.timeout(15000)
+        });
 
         if (!response.ok) {
           console.error(`API Error: ${response.status}`);
-          // 실패하면 개별적으로 재시도
+          // 실패하면 0으로 처리
           for (const keyword of chunk) {
-            const singleUrl = `https://naver-api-proxy-v2.vercel.app/api?keyword=${encodeURIComponent(keyword)}`;
-            const singleResponse = await fetch(singleUrl);
-            if (singleResponse.ok) {
-              const singleData = await singleResponse.json();
-              const match = singleData.keywordList?.[0];
-              if (match) {
-                results.push({
-                  keyword,
-                  relKeyword: match.relKeyword || keyword,
-                  monthlyPcQcCnt: match.monthlyPcQcCnt || 0,
-                  monthlyMobileQcCnt: match.monthlyMobileQcCnt || 0,
-                  monthlyAvePcClkCnt: match.monthlyAvePcClkCnt || 0,
-                  monthlyAveMobileClkCnt: match.monthlyAveMobileClkCnt || 0,
-                  monthlyAvePcCtr: match.monthlyAvePcCtr || 0,
-                  monthlyAveMobileCtr: match.monthlyAveMobileCtr || 0,
-                  plAvgDepth: match.plAvgDepth || 0,
-                  compIdx: match.compIdx || '-',
-                });
-              }
-            }
-            await new Promise(resolve => setTimeout(resolve, 150));
+            results.push({
+              keyword,
+              error: `API Error ${response.status}`,
+              relKeyword: keyword,
+              monthlyPcQcCnt: 0,
+              monthlyMobileQcCnt: 0,
+              monthlyAvePcClkCnt: 0,
+              monthlyAveMobileClkCnt: 0,
+              monthlyAvePcCtr: 0,
+              monthlyAveMobileCtr: 0,
+              plAvgDepth: 0,
+              compIdx: '-',
+            });
           }
           continue;
         }
@@ -68,8 +63,9 @@ export default async function handler(req, res) {
         const data = await response.json();
         const keywordList = data.keywordList || [];
         
-        // 각 키워드에 매칭
+        // 요청한 각 키워드에 대해 정확히 매칭
         for (const keyword of chunk) {
+          // 대소문자 무시하고 정확히 일치하는 키워드 찾기
           const match = keywordList.find(
             item => item.relKeyword && item.relKeyword.toLowerCase() === keyword.toLowerCase()
           );
@@ -78,8 +74,8 @@ export default async function handler(req, res) {
             results.push({
               keyword,
               relKeyword: match.relKeyword || keyword,
-              monthlyPcQcCnt: match.monthlyPcQcCnt || 0,
-              monthlyMobileQcCnt: match.monthlyMobileQcCnt || 0,
+              monthlyPcQcCnt: match.monthlyPcQcCnt === "< 10" ? 0 : (match.monthlyPcQcCnt || 0),
+              monthlyMobileQcCnt: match.monthlyMobileQcCnt === "< 10" ? 0 : (match.monthlyMobileQcCnt || 0),
               monthlyAvePcClkCnt: match.monthlyAvePcClkCnt || 0,
               monthlyAveMobileClkCnt: match.monthlyAveMobileClkCnt || 0,
               monthlyAvePcCtr: match.monthlyAvePcCtr || 0,
@@ -88,9 +84,10 @@ export default async function handler(req, res) {
               compIdx: match.compIdx || '-',
             });
           } else {
+            // 정확히 일치하지 않으면 0 처리
             results.push({
               keyword,
-              error: 'No exact match',
+              error: 'No exact match found',
               relKeyword: keyword,
               monthlyPcQcCnt: 0,
               monthlyMobileQcCnt: 0,
@@ -106,12 +103,11 @@ export default async function handler(req, res) {
 
         // 청크 사이 대기
         if (i + chunkSize < keywords.length) {
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 200));
         }
 
       } catch (error) {
         console.error(`Chunk error:`, error);
-        // 에러 시 해당 청크의 모든 키워드 0 처리
         for (const keyword of chunk) {
           results.push({
             keyword,
