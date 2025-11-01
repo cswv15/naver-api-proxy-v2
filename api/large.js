@@ -12,10 +12,27 @@ export default async function handler(req, res) {
   }
 
   try {
-    let keywords = req.body?.keywords;
+    // Body 파싱 에러 처리
+    let body;
+    try {
+      body = req.body;
+    } catch (e) {
+      return res.status(400).json({ error: 'Invalid request body', message: e.message });
+    }
+
+    let keywords = body?.keywords;
+    
+    // keywords가 없으면 전체 body를 확인
+    if (!keywords && typeof body === 'string') {
+      // 문자열로 왔을 경우
+      keywords = body;
+    }
     
     if (!keywords) {
-      return res.status(400).json({ error: 'keywords is required' });
+      return res.status(400).json({ 
+        error: 'keywords is required',
+        receivedBody: JSON.stringify(body)
+      });
     }
     
     // 문자열이면 배열로 변환
@@ -32,7 +49,7 @@ export default async function handler(req, res) {
     keywords = keywords.filter(k => k && String(k).trim()).map(k => String(k).trim());
     
     if (keywords.length === 0) {
-      return res.status(400).json({ error: 'keywords array is empty' });
+      return res.status(400).json({ error: 'keywords array is empty after processing' });
     }
     
     if (keywords.length > 100) {
@@ -97,7 +114,6 @@ export default async function handler(req, res) {
           });
         }
 
-        // Rate limit 방지
         if (i < keywords.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 200));
         }
