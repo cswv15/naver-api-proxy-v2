@@ -69,6 +69,7 @@ function pickKey() {
   for (let step = 0; step < KEY_POOL.length; step++) {
     const idx = (rrIndex + step) % KEY_POOL.length;
     if (!isCooling(idx)) {
+      console.log(`[DataLab] Using key #${idx}`); // 로그 추가
       rrIndex = (idx + 1) % KEY_POOL.length;
       return { idx, key: KEY_POOL[idx] };
     }
@@ -93,11 +94,13 @@ async function dlFetchWithRotation(body) {
         body: JSON.stringify(body),
       });
       if (r.status === 429) { // rate limit
+        console.log(`[DataLab] Key #${idx} rate limited (429), switching...`); // 로그 추가
         markCooldown(idx); // 60초 냉각
         lastErr = new Error('429 Too Many Requests');
         continue; // 다음 키로
       }
       if (r.status === 401 || r.status === 403) { // 인증/권한
+        console.log(`[DataLab] Key #${idx} auth error (${r.status}), switching...`); // 로그 추가
         markCooldown(idx, 5 * 60_000); // 5분 냉각
         lastErr = new Error(`${r.status} Auth/Permission`);
         continue; // 다음 키로
@@ -110,6 +113,7 @@ async function dlFetchWithRotation(body) {
     } catch (e) {
       lastErr = e;
       // 네트워크 에러 등 -> 다음 키 시도
+      console.log(`[DataLab] Key #${idx} network error, switching...`); // 로그 추가
       markCooldown(idx, 30_000);
       continue;
     }
@@ -133,11 +137,10 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods','GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers','Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
-  const body = req.body || {};
-  const keyword = (body.keyword || req.query.keyword || '').trim();
-  const timeUnit = body.timeUnit || 'month'; // month 권장
+  // GET/POST 둘 다 지원
+  const keyword = (req.query.keyword || req.body?.keyword || '').trim();
+  const timeUnit = req.query.timeUnit || req.body?.timeUnit || 'month';
   if (!keyword) return res.status(400).json({ error: 'keyword is required' });
 
   // 기간: 최근 1년
