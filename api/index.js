@@ -16,8 +16,9 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'keyword is required' });
   }
 
-  // 키워드 앞뒤 공백 제거 (중간 공백은 유지)
-  keyword = keyword.trim();
+  // ✅ 공백 완전 제거 (네이버 키워드 도구와 동일하게 처리)
+  // "부산 맛집" → "부산맛집"
+  keyword = keyword.replace(/\s+/g, '').trim();
 
   // ✅ 네이버 광고 API 인증 키
   const API_KEY = '0100000000b4a432729b7e7e42b6b9f87f73bac533ae2b1f4e7ee5eccbe9de62ffbedffcb5';
