@@ -24,7 +24,6 @@ export default async function handler(req, res) {
     
     // keywords가 없으면 전체 body를 확인
     if (!keywords && typeof body === 'string') {
-      // 문자열로 왔을 경우
       keywords = body;
     }
     
@@ -35,9 +34,12 @@ export default async function handler(req, res) {
       });
     }
     
-    // 문자열이면 배열로 변환
+    // 문자열이면 배열로 변환 (강화된 공백 처리)
     if (typeof keywords === 'string') {
-      keywords = keywords.split('\n').filter(k => k && k.trim()).map(k => k.trim());
+      keywords = keywords
+        .split(/[\r\n]+/)              // \r\n, \n, \r 모두 처리
+        .map(k => k.trim())            // 앞뒤 공백 제거
+        .filter(k => k.length > 0);    // 빈 문자열 완전 제거
     }
     
     // 배열이 아니면 배열로 만들기
@@ -45,21 +47,28 @@ export default async function handler(req, res) {
       keywords = [String(keywords)];
     }
     
-    // 빈 값 제거
-    keywords = keywords.filter(k => k && String(k).trim()).map(k => String(k).trim());
+    // 빈 값 제거 + 중간 공백 제거 (네이버 키워드 도구와 동일하게)
+    keywords = keywords
+      .map(k => String(k).replace(/\s+/g, '').trim())  // ✅ 모든 공백 제거 ("부산 맛집" → "부산맛집")
+      .filter(k => k.length > 0);  // 빈 문자열 제거
     
     if (keywords.length === 0) {
       return res.status(400).json({ error: 'keywords array is empty after processing' });
     }
     
-    if (keywords.length > 100) {
-      return res.status(400).json({ error: 'Maximum 100 keywords allowed' });
+    if (keywords.length > 200) {
+      return res.status(400).json({ error: 'Maximum 200 keywords allowed' });
     }
 
     const results = [];
     
     for (let i = 0; i < keywords.length; i++) {
       const keyword = keywords[i];
+      
+      // 추가 안전장치: 빈 키워드 스킵
+      if (!keyword || keyword.trim().length === 0) {
+        continue;
+      }
       
       try {
         const apiUrl = `https://naver-api-proxy-v2.vercel.app/api?keyword=${encodeURIComponent(keyword)}`;
@@ -114,6 +123,7 @@ export default async function handler(req, res) {
           });
         }
 
+        // Rate limit 방지: 200ms 대기
         if (i < keywords.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 200));
         }
