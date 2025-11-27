@@ -12,7 +12,11 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'keywords parameter required' });
     }
     
-    let keywords = keywordsParam.split(/[,\n]+/).filter(k => k && k.trim()).map(k => k.trim());
+    // ✅ 공백 제거 추가: "부산 맛집" → "부산맛집"
+    let keywords = keywordsParam
+      .split(/[,\n]+/)
+      .map(k => k.replace(/\s+/g, '').trim())  // 모든 공백 제거
+      .filter(k => k.length > 0);
     
     if (keywords.length === 0) {
       return res.status(400).json({ error: 'keywords array is empty' });
